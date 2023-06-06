@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+
+		<title></title>
+
+		<link rev="made" href="mailto:cho45@lowreal.net"/>
+		<style>
+			html {
+				position: absolute;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				overflow: hidden;
+			}
+
+			body {
+				margin: 0;
+				padding: 0;
+				height: 100%;
+				background: #000;
+			}
+
+			canvas {
+				position: absolute;
+				top: 0;
+				left: 0;
+				height: 100%;
+				width: 100%;
+			}
+
+			#app {
+				display: flex;
+				flex-flow: column nowrap;
+				flex-direction: column;
+				height: 100%;
+			}
+
+			#options {
+				position: absolute;
+				bottom: 0;
+				right: 0;
+				background: #fff;
+				opacity: 0.8;
+				padding: 5px;
+				font-size: 14px;
+			}
+
+			#tuner {
+				position: absolute;
+				top: 0;
+				right: 0;
+				padding: 10px;
+				background: #000;
+				color: #fff;
+				opacity: 0.8;
+			}
+
+			#tuner .indicator {
+				text-align: center;
+				display: flex;
+				font-size: 20px;
+				font-weight: bold;
+			}
+			#tuner .indicator > div {
+				padding: 10px;
+			}
+			#tuner .indicator .arrow {
+				visibility: hidden;
+			}
+			#tuner .indicator .arrow.active {
+				visibility: visible;
+			}
+			#tuner .info {
+				text-align: right;
+				line-height: 1.1;
+			}
+		</style>
+		<script src="lib/vue.global.js" defer></script>
+		<script src="script.js" type="module" defer></script>
+	</head>
+	<body>
+		<div id="app">
+			<div style="flex-grow: 1" @click="start">
+				<div style="position: relative; width: 100%; height: 100%">
+					<canvas ref="graph"></canvas>
+					<canvas ref="main"></canvas>
+				</div>
+			</div>
+			<div style="background: #fff" v-show="showScope">
+				<div style="position: relative; height: 200px">
+					<canvas ref="scope" width="4096" height="200"></canvas>
+				</div>
+			</div>
+			<div id="tuner" :style="{opacity: clarity, display: clarity > 0.97 ? 'block' : 'none'}">
+				<div class="indicator">
+					<div class="arrow" :class="{active: up}">&gt;</div>
+					<div style="width: 5em">{{nameOfNote(note)}}</div>
+					<div class="arrow" :class="{active: down}">&lt;</div>
+				</div>
+				<div class="info">
+					<div class="error">{{ freqError.toFixed(3) }} cent</div>
+					<div class="clarity">{{ Math.round(clarity * 100) }}%</div>
+					<div class="freq">{{ actualFreq.toFixed(1) }} Hz</div>
+					<div class="freq">{{ targetFreq.toFixed(1) }} Hz</div>
+				</div>
+			</div>
+			<div id="options">
+				<label>
+					<input type="checkbox" v-model="showScope"> Scope
+				</label>
+				<label>
+					Name
+					<select v-model="selectedName">
+						<option :value="names.name" v-for="names in noteName">{{ names.name }}</option>
+					</select>
+				</label>
+				<label>
+					Scale
+					<select v-model="scale">
+						<optgroup label="major">
+							<option value="0,major">C</option>
+							<option value="1,major">Db/C#</option>
+							<option value="2,major">D</option>
+							<option value="3,major">Eb/D#</option>
+							<option value="4,major">E</option>
+							<option value="5,major">F</option>
+							<option value="6,major">Gb/F#</option>
+							<option value="7,major">G</option>
+							<option value="8,major">Ab/G#</option>
+							<option value="9,major">A</option>
+							<option value="10,major">Bb/A#</option>
+							<option value="11,major">B</option>
+						</optgroup>
+						<optgroup label="minor (natural)">
+							<option value="0,minor">Cm</option>
+							<option value="1,minor">Db/C#m</option>
+							<option value="2,minor">Dm</option>
+							<option value="3,minor">Eb/D#m</option>
+							<option value="4,minor">Em</option>
+							<option value="5,minor">Fm</option>
+							<option value="6,minor">Gb/F#m</option>
+							<option value="7,minor">Gm</option>
+							<option value="8,minor">Ab/G#m</option>
+							<option value="9,minor">Am</option>
+							<option value="10,minor">Bb/A#m</option>
+							<option value="11,minor">Bm</option>
+						</optgroup>
+					</select>
+				</label>
+				<label>
+					Tune
+					<input type="number" v-model="freqOfA4">
+				</label>
+			</div>
+		</div>
+	</body>
+</html>
