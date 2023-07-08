@@ -4,6 +4,8 @@ import { PitchDetector } from "./lib/pitchy.mjs";
 Vue.createApp({
 	data() {
 		return {
+			status: "Tap to start",
+
 			// https://en.wikipedia.org/wiki/Scientific_pitch_notation
 			// center C is note number 60
 			// center A is note number 69 and 440Hz
@@ -24,6 +26,8 @@ Vue.createApp({
 			up: false,
 			down: false,
 			selectedName: "CDEFGAB",
+
+			openSetting: false,
 
 			noteName: [
 				{
@@ -49,6 +53,16 @@ Vue.createApp({
 					values: [
 						"ド", "ド♯", "レ", "レ♯", "ミ", "ファ", "ファ♯", "ソ", "ソ♯", "ラ", "ラ♯", "シ"
 					]
+				},
+				{
+					name: "ハニホヘトイロ",
+					values: [
+						"ハ", "嬰ハ", "ニ", "嬰ニ", "ホ", "ヘ", "嬰ヘ", "ト", "嬰ト", "イ", "嬰イ", "ロ"
+					]
+				},
+				{
+					name: "Hz",
+					values: []
 				},
 			],
 		}
@@ -77,6 +91,10 @@ Vue.createApp({
 		selectedName() {
 			this.initCanvas();
 		},
+
+		freqOfA4() {
+			this.initCanvas();
+		}
 	},
 
 	mounted() {
@@ -100,9 +118,13 @@ Vue.createApp({
 		nameOfNote: function (note) {
 			note = Math.round(note);
 			const octave = Math.floor(note / 12) - 1;
-			const names = this.noteName.find( (i) => i.name === this.selectedName );
-			const name = names.values[note % 12];
-			return name + octave;
+			if (this.selectedName === 'Hz') {
+				return this.noteToHz(note).toFixed(1);
+			} else {
+				const names = this.noteName.find( (i) => i.name === this.selectedName );
+				const name = names.values[note % 12];
+				return name + octave;
+			}
 		},
 
 		isScaleTone: function (note) {
@@ -191,6 +213,7 @@ Vue.createApp({
 		start: async function () {
 			if (this.audioContext) return;
 
+			this.status = "Recording";
 			this.audioContext = new AudioContext({
 				latencyHint: 'interactive',
 				sampleRate: 44100,
@@ -223,10 +246,12 @@ Vue.createApp({
 
 
 			analyser.fftSize = 4096;
-			analyser.smoothingTimeConstant = 0.0;
+			analyser.smoothingTimeConstant = 0.1;
 
 
-			const detector = PitchDetector.forFloat32Array(analyser.fftSize);
+			const PART = 4;
+			const PART_LENGTH = analyser.fftSize / PART;
+			const detector = PitchDetector.forFloat32Array(PART_LENGTH);
 
 			const scopeCtx = this.$refs.scope.getContext("2d");
 			const scopeWidth = this.$refs.scope.width;
@@ -240,49 +265,54 @@ Vue.createApp({
 
 				analyser.getFloatTimeDomainData(audioData);
 
-				const [freq, clarity] = detector.findPitch(audioData, sampleRate);
-				const note = this.hzToNote(freq);
-				// console.log({clarity, freq, note});
-				const y = this.mainHeight / this.noteLength * (this.noteLength - (note - this.startNote));
+				for (let p = 0; p < PART; p++) {
+					const start = PART_LENGTH * p;
+					const [freq, clarity] = detector.findPitch(audioData.subarray(start, start + PART_LENGTH), sampleRate);
 
-				// draw dot
-				this.graphCtx.drawImage(
-					this.$refs.graph,
-					// source
-					1, 0, this.$refs.graph.width - 1, this.$refs.graph.height,
-					// dest
-					0, 0, this.$refs.graph.width - 1, this.$refs.graph.height
-				);
-				this.graphCtx.fillStyle = "#000000";
-				this.graphCtx.fillRect(this.mainWidth - 5, 0, 5, this.mainHeight);
-				this.graphCtx.fillStyle = `rgba(255, 0, 0, ${clarity})`;
-				this.graphCtx.fillRect(this.mainWidth - 5, y - 5, 10, 10);
+					const note = this.hzToNote(freq);
+					// console.log({clarity, freq, note});
+					const y = this.mainHeight / this.noteLength * (this.noteLength - (note - this.startNote));
 
-
-				// draw info
-				const fit  = this.noteToHz(Math.round(note));
-				this.targetFreq = fit;
-				this.actualFreq = freq;
-				this.clarity = clarity;
-				this.note = note;
-				this.freqError = this.differenceInCent(fit, freq);
-
-				this.up = this.freqError < -5;
-				this.down = this.freqError > 5;
-
-				// draw scope
-				scopeCtx.fillStyle = "#000000";
-				scopeCtx.fillRect(0, 0, scopeWidth, scopeHeight);
-				scopeCtx.strokeStyle = "#fff";
-				scopeCtx.beginPath();
-				scopeCtx.moveTo(0, scopeHeight / 2);
-				for (var i = 0, len = audioData.length; i < len; i++) {
-					scopeCtx.lineTo(
-						scopeWidth / len * i, 
-						(audioData[i] / 2) * scopeHeight + scopeHeight / 2
+					// draw dot
+					this.graphCtx.drawImage(
+						this.$refs.graph,
+						// source
+						1, 0, this.$refs.graph.width - 1, this.$refs.graph.height,
+						// dest
+						0, 0, this.$refs.graph.width - 1, this.$refs.graph.height
 					);
+					this.graphCtx.fillStyle = "#000000";
+					this.graphCtx.fillRect(this.mainWidth - 4, 0, 4, this.mainHeight);
+					this.graphCtx.fillStyle = `rgba(255, 0, 0, ${clarity})`;
+					this.graphCtx.fillRect(this.mainWidth - 4, y - 4, 8, 8);
+
+
+					// draw info
+					const fit  = this.noteToHz(Math.round(note));
+					this.targetFreq = fit;
+					this.actualFreq = freq;
+					this.clarity = clarity;
+					this.note = note;
+					this.freqError = this.differenceInCent(fit, freq);
+
+					this.up = this.freqError < -5;
+					this.down = this.freqError > 5;
+
+					// draw scope
+					scopeCtx.fillStyle = "#000000";
+					scopeCtx.fillRect(0, 0, scopeWidth, scopeHeight);
+					scopeCtx.strokeStyle = "#fff";
+					scopeCtx.beginPath();
+					scopeCtx.moveTo(0, scopeHeight / 2);
+					for (var i = 0, len = audioData.length; i < len; i++) {
+						scopeCtx.lineTo(
+							scopeWidth / len * i, 
+							(audioData[i] / 2) * scopeHeight + scopeHeight / 2
+						);
+					}
+					scopeCtx.stroke();
 				}
-				scopeCtx.stroke();
+
 
 				requestAnimationFrame(draw);
 			};

@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<meta charset="utf-8"/>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-		<title></title>
+		<title>Pitch Detecter</title>
 
-		<link rev="made" href="mailto:cho45@lowreal.net"/>
+		<link rev="made" href="mailto:cho45@lowreal.net">
+		<link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
 		<style>
 			html {
 				position: absolute;
@@ -39,20 +40,50 @@
 				height: 100%;
 			}
 
+			#status {
+				position: absolute;
+				top: 0;
+				right: 0;
+				background: #fff;
+				opacity: 0.8;
+				padding: 5px 10px;
+				font-size: 14px;
+			}
+
 			#options {
 				position: absolute;
 				bottom: 0;
 				right: 0;
 				background: #fff;
 				opacity: 0.8;
-				padding: 5px;
+				padding: 5px 10px;
 				font-size: 14px;
+			}
+
+			#options p {
+				display: flex;
+				margin: 10px 5px;
+				padding: 0;
+				align-items: center;
+			}
+
+			#options p > label {
+				order: 0;
+				width: 7em;
+				padding: 0 1em 0 0;
+			}
+
+			#options p > input[type="checkbox"] {
+				order: 1;
+				flex: none;
+				width: auto;
 			}
 
 			#tuner {
 				position: absolute;
 				top: 0;
-				right: 0;
+				left: 50%;
+				transform: translateX(-50%);
 				padding: 10px;
 				background: #000;
 				color: #fff;
@@ -95,7 +126,7 @@
 					<canvas ref="scope" width="4096" height="200"></canvas>
 				</div>
 			</div>
-			<div id="tuner" :style="{opacity: clarity, display: clarity > 0.97 ? 'block' : 'none'}">
+			<div id="tuner" :style="{opacity: clarity, display: clarity > 0.95 ? 'block' : 'none'}">
 				<div class="indicator">
 					<div class="arrow" :class="{active: up}">&gt;</div>
 					<div style="width: 5em">{{nameOfNote(note)}}</div>
@@ -108,53 +139,75 @@
 					<div class="freq">{{ targetFreq.toFixed(1) }} Hz</div>
 				</div>
 			</div>
+			<div id="status">{{status}}</div>
 			<div id="options">
-				<label>
-					<input type="checkbox" v-model="showScope"> Scope
-				</label>
-				<label>
-					Name
-					<select v-model="selectedName">
-						<option :value="names.name" v-for="names in noteName">{{ names.name }}</option>
-					</select>
-				</label>
-				<label>
-					Scale
-					<select v-model="scale">
-						<optgroup label="major">
-							<option value="0,major">C</option>
-							<option value="1,major">Db/C#</option>
-							<option value="2,major">D</option>
-							<option value="3,major">Eb/D#</option>
-							<option value="4,major">E</option>
-							<option value="5,major">F</option>
-							<option value="6,major">Gb/F#</option>
-							<option value="7,major">G</option>
-							<option value="8,major">Ab/G#</option>
-							<option value="9,major">A</option>
-							<option value="10,major">Bb/A#</option>
-							<option value="11,major">B</option>
-						</optgroup>
-						<optgroup label="minor (natural)">
-							<option value="0,minor">Cm</option>
-							<option value="1,minor">Db/C#m</option>
-							<option value="2,minor">Dm</option>
-							<option value="3,minor">Eb/D#m</option>
-							<option value="4,minor">Em</option>
-							<option value="5,minor">Fm</option>
-							<option value="6,minor">Gb/F#m</option>
-							<option value="7,minor">Gm</option>
-							<option value="8,minor">Ab/G#m</option>
-							<option value="9,minor">Am</option>
-							<option value="10,minor">Bb/A#m</option>
-							<option value="11,minor">Bm</option>
-						</optgroup>
-					</select>
-				</label>
-				<label>
-					Tune
-					<input type="number" v-model="freqOfA4">
-				</label>
+				<div style="text-align: right">
+					<div @click="openSetting = !openSetting">
+						<span v-if="!openSetting">
+							Setting...
+						</span>
+						<span v-else>
+							Close
+						</span>
+					</div>
+				</div>
+				<div v-if="openSetting">
+					<p>
+						<input type="checkbox" v-model="showScope" id="options-scope">
+						<label for="options-scope">
+							Scope
+						</label>
+					</p>
+					<p>
+						<label for="options-name">
+							Name
+						</label>
+						<select v-model="selectedName" id="options-name">
+							<option :value="names.name" v-for="names in noteName">{{ names.name }}</option>
+						</select>
+					</p>
+					<p>
+						<label for="options-scale">
+							Scale
+						</label>
+						<select v-model="scale" id="options-scale">
+							<optgroup label="major">
+								<option value="0,major">C</option>
+								<option value="1,major">D&#x266D;/C&#x266F;</option>
+								<option value="2,major">D</option>
+								<option value="3,major">E&#x266D;/D&#x266F;</option>
+								<option value="4,major">E</option>
+								<option value="5,major">F</option>
+								<option value="6,major">G&#x266D;/F&#x266F;</option>
+								<option value="7,major">G</option>
+								<option value="8,major">A&#x266D;/G&#x266F;</option>
+								<option value="9,major">A</option>
+								<option value="10,major">B&#x266D;/A&#x266F;</option>
+								<option value="11,major">B</option>
+							</optgroup>
+							<optgroup label="minor (natural)">
+								<option value="0,minor">Cm</option>
+								<option value="1,minor">D&#x266D;/C&#x266F;m</option>
+								<option value="2,minor">Dm</option>
+								<option value="3,minor">E&#x266D;/D&#x266F;m</option>
+								<option value="4,minor">Em</option>
+								<option value="5,minor">Fm</option>
+								<option value="6,minor">G&#x266D;/F&#x266F;m</option>
+								<option value="7,minor">Gm</option>
+								<option value="8,minor">A&#x266D;/G&#x266F;m</option>
+								<option value="9,minor">Am</option>
+								<option value="10,minor">B&#x266D;/A&#x266F;m</option>
+								<option value="11,minor">Bm</option>
+							</optgroup>
+						</select>
+					</p>
+					<p>
+						<label for="options-tune">
+							Freq. of A4
+						</label>
+						<input type="number" v-model="freqOfA4" id="options-tune">
+					</p>
+				</div>
 			</div>
 		</div>
 	</body>
