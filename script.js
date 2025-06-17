@@ -1,6 +1,7 @@
 
 import { PitchDetector } from "./lib/pitchy.mjs";
 import { YINDetector, createYINDetector } from "./lib/yin.js";
+import { PYINDetector, createPYINDetector } from "./lib/pyin.js";
 
 Vue.createApp({
 	data() {
@@ -29,7 +30,7 @@ Vue.createApp({
 			selectedName: "CDEFGAB",
 
 			// YIN/Pitchy algorithm selection
-			pitchAlgorithm: "yin", // "pitchy" or "yin"
+			pitchAlgorithm: "yin", // "pitchy", "yin", or "pyin"
 
 			openSetting: false,
 
@@ -267,6 +268,9 @@ Vue.createApp({
 			if (this.pitchAlgorithm === 'yin') {
 				detector = new YINDetector(sampleRate, PART_LENGTH, 0.2);
 				console.log('🎵 Using YIN pitch detection algorithm');
+			} else if (this.pitchAlgorithm === 'pyin') {
+				detector = new PYINDetector(sampleRate, PART_LENGTH);
+				console.log('🎵 Using PYIN pitch detection algorithm');
 			} else {
 				detector = PitchDetector.forFloat32Array(PART_LENGTH);
 				console.log('🎵 Using Pitchy pitch detection algorithm');
