@@ -1,0 +1,27 @@
+{
+  "name": "pitch-detector",
+  "version": "1.0.0",
+  "description": "Real-time pitch detection and tuner application with YIN and Pitchy algorithms",
+  "main": "script.js",
+  "type": "module",
+  "scripts": {
+    "test": "node test/yin.test.js",
+    "serve": "python -m http.server 8000",
+    "start": "npm run serve"
+  },
+  "keywords": [
+    "pitch-detection",
+    "tuner",
+    "yin-algorithm",
+    "autocorrelation",
+    "music",
+    "audio-processing"
+  ],
+  "author": "cho45",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

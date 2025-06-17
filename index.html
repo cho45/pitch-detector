@@ -207,6 +207,15 @@
 						</label>
 						<input type="number" v-model="freqOfA4" id="options-tune">
 					</p>
+					<p>
+						<label for="options-algorithm">
+							Algorithm
+						</label>
+						<select v-model="pitchAlgorithm" id="options-algorithm">
+							<option value="pitchy">Pitchy (Autocorr + NSDF)</option>
+							<option value="yin">YIN (Difference Function)</option>
+						</select>
+					</p>
 				</div>
 			</div>
 		</div>

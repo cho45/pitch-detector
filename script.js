@@ -1,5 +1,6 @@
 
 import { PitchDetector } from "./lib/pitchy.mjs";
+import { YINDetector, createYINDetector } from "./lib/yin.js";
 
 Vue.createApp({
 	data() {
@@ -26,6 +27,9 @@ Vue.createApp({
 			up: false,
 			down: false,
 			selectedName: "CDEFGAB",
+
+			// YIN/Pitchy algorithm selection
+			pitchAlgorithm: "pitchy", // "pitchy" or "yin"
 
 			openSetting: false,
 
@@ -94,6 +98,11 @@ Vue.createApp({
 
 		freqOfA4() {
 			this.initCanvas();
+		},
+
+		pitchAlgorithm() {
+			console.log(`🔄 Switching to ${this.pitchAlgorithm} algorithm`);
+			// Note: Detector will be recreated on next start() call
 		}
 	},
 
@@ -251,7 +260,19 @@ Vue.createApp({
 
 			const PART = 4;
 			const PART_LENGTH = analyser.fftSize / PART;
-			const detector = PitchDetector.forFloat32Array(PART_LENGTH);
+			
+			// Create detector based on selected algorithm
+			let detector;
+			if (this.pitchAlgorithm === 'yin') {
+				const yinDetector = new YINDetector(sampleRate, PART_LENGTH, 0.1, false);
+				detector = {
+					findPitch: (audioBuffer, sr) => yinDetector.findPitch(audioBuffer, sr)
+				};
+				console.log('🎵 Using YIN pitch detection algorithm');
+			} else {
+				detector = PitchDetector.forFloat32Array(PART_LENGTH);
+				console.log('🎵 Using Pitchy pitch detection algorithm');
+			}
 
 			const scopeCtx = this.$refs.scope.getContext("2d");
 			const scopeWidth = this.$refs.scope.width;
@@ -261,13 +282,30 @@ Vue.createApp({
 			const dataArray = new Uint8Array(analyser.frequencyBinCount);
 			const audioData = new Float32Array(analyser.fftSize);
 			const sampleRate = this.audioContext.sampleRate;
+			
+			// Performance monitoring
+			let frameCount = 0;
+			let totalPitchTime = 0;
+			
 			const draw = () => {
-
 				analyser.getFloatTimeDomainData(audioData);
 
 				for (let p = 0; p < PART; p++) {
 					const start = PART_LENGTH * p;
+					
+					// Measure pitch detection performance
+					const pitchStart = performance.now();
 					const [freq, clarity] = detector.findPitch(audioData.subarray(start, start + PART_LENGTH), sampleRate);
+					const pitchTime = performance.now() - pitchStart;
+					
+					totalPitchTime += pitchTime;
+					frameCount++;
+					
+					// Log performance every 100 frames
+					if (frameCount % 100 === 0) {
+						const avgTime = totalPitchTime / frameCount;
+						console.log(`📊 ${this.pitchAlgorithm.toUpperCase()} avg detection time: ${avgTime.toFixed(3)}ms/frame`);
+					}
 
 					const note = this.hzToNote(freq);
 					// console.log({clarity, freq, note});
