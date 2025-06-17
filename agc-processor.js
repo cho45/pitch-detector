@@ -93,6 +93,7 @@ class AGCProcessor extends AudioWorkletProcessor {
     process(inputs, outputs, parameters) {
         const input = inputs[0];
         const output = outputs[0];
+        const enabled = parameters.enabled[0];
         
         // Handle case where there's no input
         if (!input || input.length === 0 || !input[0]) {
@@ -104,6 +105,14 @@ class AGCProcessor extends AudioWorkletProcessor {
         const bufferLength = inputChannel.length;
         
         if (!outputChannel || bufferLength === 0) {
+            return true;
+        }
+        
+        // If disabled, just pass through
+        if (enabled < 0.5) {
+            for (let i = 0; i < bufferLength; i++) {
+                outputChannel[i] = inputChannel[i];
+            }
             return true;
         }
         

@@ -241,9 +241,13 @@ Vue.createApp({
 
 		agcEnabled() {
 			console.log(`🎚️ AGC ${this.agcEnabled ? 'enabled' : 'disabled'}`);
-			// Note: AGC enable/disable requires restart due to audio graph connection changes
-			if (this.audioContext && this.agc) {
-				console.log('💡 Restart recording to apply AGC enable/disable changes');
+			// Update AGC enabled parameter in real-time
+			if (this.audioContext && this.agc && this.agc.getNode()) {
+				const enabledParam = this.agc.getNode().parameters.get('enabled');
+				if (enabledParam) {
+					enabledParam.value = this.agcEnabled ? 1 : 0;
+					console.log('🎚️ AGC enabled parameter updated in real-time');
+				}
 			}
 		}
 	},
@@ -386,16 +390,15 @@ Vue.createApp({
 			try {
 				await this.agc.init();
 
-				// Connect audio graph: source -> AGC AudioWorklet -> analyser
-				if (this.agcEnabled && this.agc.ready()) {
-					source.connect(this.agc.getNode());
-					this.agc.getNode().connect(analyser);
-					console.log('🎚️ AGC AudioWorklet connected in audio graph');
-				} else {
-					// Fallback: direct connection without AGC
-					source.connect(analyser);
-					console.log('⚠️ AGC disabled, using direct audio connection');
-				}
+				// Always connect audio graph: source -> AGC AudioWorklet -> analyser
+				source.connect(this.agc.getNode());
+				this.agc.getNode().connect(analyser);
+				
+				// Set initial enabled state
+				const enabledParam = this.agc.getNode().parameters.get('enabled');
+				enabledParam.value = this.agcEnabled ? 1 : 0;
+				
+				console.log('🎚️ AGC AudioWorklet connected in audio graph');
 			} catch (error) {
 				console.error('❌ AGC AudioWorklet initialization failed:', error);
 				// Fallback to direct connection
@@ -519,9 +522,9 @@ Vue.createApp({
 			requestAnimationFrame(draw);
 		},
 
-		stop: function() {
+		stop: async function() {
 			if (this.audioContext) {
-				this.audioContext.close();
+				await this.audioContext.close();
 				this.audioContext = null;
 				this.agc = null;
 				this.status = "Tap to start";
