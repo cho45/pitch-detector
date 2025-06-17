@@ -140,6 +140,14 @@
 				</div>
 			</div>
 			<div id="status">{{status}}</div>
+			<div style="text-align: center; margin: 10px;">
+				<button v-if="audioContext" @click="stop" style="padding: 8px 16px; background: #ff4444; color: white; border: none; border-radius: 4px; cursor: pointer;">
+					Stop Recording
+				</button>
+				<button v-else @click="start" style="padding: 8px 16px; background: #44ff44; color: white; border: none; border-radius: 4px; cursor: pointer;">
+					Start Recording
+				</button>
+			</div>
 			<div id="options">
 				<div style="text-align: right">
 					<div @click="openSetting = !openSetting">
@@ -216,6 +224,35 @@
 							<option value="yin">YIN (Difference Function)</option>
 						</select>
 					</p>
+					<p>
+						<input type="checkbox" v-model="agcEnabled" id="options-agc-enabled">
+						<label for="options-agc-enabled">
+							AGC (Automatic Gain Control)
+						</label>
+					</p>
+					<div v-if="agcEnabled">
+						<p>
+							<label for="options-agc-target">
+								AGC Target Level
+							</label>
+							<input type="range" v-model.number="agcTargetLevel" min="0.1" max="0.8" step="0.05" id="options-agc-target">
+							<span>{{ agcTargetLevel.toFixed(2) }}</span>
+						</p>
+						<p>
+							<label for="options-agc-attack">
+								AGC Attack Time (ms)
+							</label>
+							<input type="range" v-model.number="agcAttackTime" min="0.001" max="0.1" step="0.001" id="options-agc-attack">
+							<span>{{ (agcAttackTime * 1000).toFixed(1) }}ms</span>
+						</p>
+						<p>
+							<label for="options-agc-release">
+								AGC Release Time (ms)
+							</label>
+							<input type="range" v-model.number="agcReleaseTime" min="0.01" max="1.0" step="0.01" id="options-agc-release">
+							<span>{{ (agcReleaseTime * 1000).toFixed(0) }}ms</span>
+						</p>
+					</div>
 				</div>
 			</div>
 		</div>

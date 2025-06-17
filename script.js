@@ -2,6 +2,113 @@
 import { PitchDetector } from "./lib/pitchy.mjs";
 import { YINDetector, createYINDetector } from "./lib/yin.js";
 
+/**
+ * AGC AudioWorklet Node Wrapper
+ * Manages AudioWorkletNode for real-time automatic gain control
+ */
+class AGCAudioWorklet {
+	constructor(audioContext, targetLevel = 0.3, attackTime = 0.003, releaseTime = 0.1) {
+		this.audioContext = audioContext;
+		this.targetLevel = targetLevel;
+		this.attackTime = attackTime;
+		this.releaseTime = releaseTime;
+		this.maxGain = 50.0;
+		this.minGain = 0.1;
+		this.workletNode = null;
+		this.isReady = false;
+	}
+	
+	/**
+	 * Initialize the AudioWorklet
+	 * @returns {Promise<void>}
+	 */
+	async init() {
+		try {
+			// Load the AGC processor worklet
+			await this.audioContext.audioWorklet.addModule('./agc-processor.js');
+			
+			// Create the AudioWorkletNode
+			this.workletNode = new AudioWorkletNode(this.audioContext, 'agc-processor', {
+				processorOptions: {
+					targetLevel: this.targetLevel,
+					attackTime: this.attackTime,
+					releaseTime: this.releaseTime,
+					maxGain: this.maxGain,
+					minGain: this.minGain
+				}
+			});
+			
+			// Listen for messages from the processor
+			this.workletNode.port.onmessage = (event) => {
+				this.handleProcessorMessage(event.data);
+			};
+			
+			this.isReady = true;
+			console.log('🎚️ AGC AudioWorklet initialized successfully');
+			
+		} catch (error) {
+			console.error('❌ Failed to initialize AGC AudioWorklet:', error);
+			throw error;
+		}
+	}
+	
+	/**
+	 * Handle messages from the AudioWorklet processor
+	 * @param {Object} data - Message data
+	 */
+	handleProcessorMessage(data) {
+		switch (data.type) {
+			case 'agcStats':
+				console.log(`🎚️ AGC Stats: RMS=${data.stats.rms}, Envelope=${data.stats.envelope}, Gain=${data.stats.gain}x`);
+				break;
+			case 'parametersUpdated':
+				console.log('🎚️ AGC parameters updated in processor');
+				break;
+			default:
+				console.log('🎚️ AGC processor message:', data);
+		}
+	}
+	
+	/**
+	 * Get the AudioWorkletNode for connecting in audio graph
+	 * @returns {AudioWorkletNode|null} The worklet node
+	 */
+	getNode() {
+		return this.workletNode;
+	}
+	
+	/**
+	 * Update AGC parameters
+	 * @param {Object} params - Parameters to update
+	 */
+	updateParameters(params) {
+		if (!this.workletNode) {
+			console.warn('🎚️ AGC worklet not initialized, caching parameters');
+			// Cache parameters for when worklet is ready
+			if (params.targetLevel !== undefined) this.targetLevel = params.targetLevel;
+			if (params.attackTime !== undefined) this.attackTime = params.attackTime;
+			if (params.releaseTime !== undefined) this.releaseTime = params.releaseTime;
+			if (params.maxGain !== undefined) this.maxGain = params.maxGain;
+			if (params.minGain !== undefined) this.minGain = params.minGain;
+			return;
+		}
+		
+		// Send parameters to the processor
+		this.workletNode.port.postMessage(params);
+		
+		// Update local cache
+		Object.assign(this, params);
+	}
+	
+	/**
+	 * Check if the worklet is ready for use
+	 * @returns {boolean} True if ready
+	 */
+	ready() {
+		return this.isReady && this.workletNode !== null;
+	}
+}
+
 Vue.createApp({
 	data() {
 		return {
@@ -30,6 +137,12 @@ Vue.createApp({
 
 			// YIN/Pitchy algorithm selection
 			pitchAlgorithm: "yin", // "pitchy" or "yin"
+
+			// AGC settings
+			agcEnabled: true,
+			agcTargetLevel: 0.3,
+			agcAttackTime: 0.003,
+			agcReleaseTime: 0.1,
 
 			openSetting: false,
 
@@ -103,6 +216,35 @@ Vue.createApp({
 		pitchAlgorithm() {
 			console.log(`🔄 Switching to ${this.pitchAlgorithm} algorithm`);
 			// Note: Detector will be recreated on next start() call
+		},
+
+		agcTargetLevel() {
+			if (this.agc) {
+				this.agc.updateParameters({ targetLevel: this.agcTargetLevel });
+				console.log(`🎚️ AGC target level updated: ${this.agcTargetLevel.toFixed(2)}`);
+			}
+		},
+
+		agcAttackTime() {
+			if (this.agc) {
+				this.agc.updateParameters({ attackTime: this.agcAttackTime });
+				console.log(`🎚️ AGC attack time updated: ${(this.agcAttackTime * 1000).toFixed(1)}ms`);
+			}
+		},
+
+		agcReleaseTime() {
+			if (this.agc) {
+				this.agc.updateParameters({ releaseTime: this.agcReleaseTime });
+				console.log(`🎚️ AGC release time updated: ${(this.agcReleaseTime * 1000).toFixed(0)}ms`);
+			}
+		},
+
+		agcEnabled() {
+			console.log(`🎚️ AGC ${this.agcEnabled ? 'enabled' : 'disabled'}`);
+			// Note: AGC enable/disable requires restart due to audio graph connection changes
+			if (this.audioContext && this.agc) {
+				console.log('💡 Restart recording to apply AGC enable/disable changes');
+			}
 		}
 	},
 
@@ -230,20 +372,36 @@ Vue.createApp({
 
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 			const source = this.audioContext.createMediaStreamSource(stream);
-			const compressor = this.audioContext.createDynamicsCompressor();
-			compressor.threshold.value = -60;
-			compressor.knee.value = 0;
-			compressor.ratio.value = 20;
-			compressor.attack.value = 0;
-			compressor.release.value = 0.25;
-			const gain = this.audioContext.createGain();
-			gain.gain.value = 20;
-
+			
+			// Create and initialize AGC AudioWorklet
+			this.agc = new AGCAudioWorklet(
+				this.audioContext,
+				this.agcTargetLevel,
+				this.agcAttackTime,
+				this.agcReleaseTime
+			);
+			
 			const analyser = this.audioContext.createAnalyser();
+			
+			try {
+				await this.agc.init();
 
-			source.connect(compressor);
-			compressor.connect(gain);
-			gain.connect(analyser);
+				// Connect audio graph: source -> AGC AudioWorklet -> analyser
+				if (this.agcEnabled && this.agc.ready()) {
+					source.connect(this.agc.getNode());
+					this.agc.getNode().connect(analyser);
+					console.log('🎚️ AGC AudioWorklet connected in audio graph');
+				} else {
+					// Fallback: direct connection without AGC
+					source.connect(analyser);
+					console.log('⚠️ AGC disabled, using direct audio connection');
+				}
+			} catch (error) {
+				console.error('❌ AGC AudioWorklet initialization failed:', error);
+				// Fallback to direct connection
+				source.connect(analyser);
+				console.log('⚠️ Fallback: direct audio connection without AGC');
+			}
 
 			if (0) {
 				const osc = this.audioContext.createOscillator();
@@ -285,7 +443,14 @@ Vue.createApp({
 			let totalPitchTime = 0;
 			
 			const draw = () => {
+				// Stop animation loop if audio context is closed
+				if (!this.audioContext) {
+					return;
+				}
+				
 				analyser.getFloatTimeDomainData(audioData);
+				
+				// Note: AGC processing is now handled by AudioWorkletNode in real-time
 
 				for (let p = 0; p < PART; p++) {
 					const start = PART_LENGTH * p;
@@ -352,6 +517,16 @@ Vue.createApp({
 				requestAnimationFrame(draw);
 			};
 			requestAnimationFrame(draw);
+		},
+
+		stop: function() {
+			if (this.audioContext) {
+				this.audioContext.close();
+				this.audioContext = null;
+				this.agc = null;
+				this.status = "Tap to start";
+				console.log('🛑 Audio context stopped');
+			}
 		},
 
 		resize: function ()  {
