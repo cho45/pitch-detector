@@ -141,10 +141,10 @@
 			</div>
 			<div id="status">{{status}}</div>
 			<div style="text-align: center; margin: 10px;">
-				<button v-if="audioContext" @click="stop" style="padding: 8px 16px; background: #ff4444; color: white; border: none; border-radius: 4px; cursor: pointer;">
+				<button v-if="audioContext" type="button" @click="stop" style="padding: 8px 16px; background: #ff4444; color: white; border: none; border-radius: 4px; cursor: pointer;">
 					Stop Recording
 				</button>
-				<button v-else @click="start" style="padding: 8px 16px; background: #44ff44; color: white; border: none; border-radius: 4px; cursor: pointer;">
+				<button v-else @click="start" type="button" style="padding: 8px 16px; background: #44ff44; color: white; border: none; border-radius: 4px; cursor: pointer;">
 					Start Recording
 				</button>
 			</div>
