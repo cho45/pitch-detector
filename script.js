@@ -29,7 +29,7 @@ Vue.createApp({
 			selectedName: "CDEFGAB",
 
 			// YIN/Pitchy algorithm selection
-			pitchAlgorithm: "pitchy", // "pitchy" or "yin"
+			pitchAlgorithm: "yin", // "pitchy" or "yin"
 
 			openSetting: false,
 
@@ -260,14 +260,12 @@ Vue.createApp({
 
 			const PART = 4;
 			const PART_LENGTH = analyser.fftSize / PART;
+			const sampleRate = this.audioContext.sampleRate;
 			
 			// Create detector based on selected algorithm
 			let detector;
 			if (this.pitchAlgorithm === 'yin') {
-				const yinDetector = new YINDetector(sampleRate, PART_LENGTH, 0.1, false);
-				detector = {
-					findPitch: (audioBuffer, sr) => yinDetector.findPitch(audioBuffer, sr)
-				};
+				detector = new YINDetector(sampleRate, PART_LENGTH, 0.2);
 				console.log('🎵 Using YIN pitch detection algorithm');
 			} else {
 				detector = PitchDetector.forFloat32Array(PART_LENGTH);
@@ -281,7 +279,6 @@ Vue.createApp({
 
 			const dataArray = new Uint8Array(analyser.frequencyBinCount);
 			const audioData = new Float32Array(analyser.fftSize);
-			const sampleRate = this.audioContext.sampleRate;
 			
 			// Performance monitoring
 			let frameCount = 0;
