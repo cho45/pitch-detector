@@ -97,7 +97,11 @@ class AGCAudioWorklet {
 		this.workletNode.port.postMessage(params);
 		
 		// Update local cache
-		Object.assign(this, params);
+		if (params.targetLevel !== undefined) this.targetLevel = params.targetLevel;
+		if (params.attackTime !== undefined) this.attackTime = params.attackTime;
+		if (params.releaseTime !== undefined) this.releaseTime = params.releaseTime;
+		if (params.maxGain !== undefined) this.maxGain = params.maxGain;
+		if (params.minGain !== undefined) this.minGain = params.minGain;
 	}
 	
 	/**
