@@ -58,11 +58,13 @@ log(''.padEnd(60, '='), colors.blue);
 runTest('calculateDifferenceFunction - 境界条件テスト', () => {
     // 最小サイズテスト
     const tinySignal = new Float32Array([1.0]);
-    const df1 = YINCore.calculateDifferenceFunction(tinySignal);
+    const df1 = new Float32Array(tinySignal.length);
+    YINCore.calculateDifferenceFunction(tinySignal, df1);
     
     // サイズ2テスト
     const smallSignal = new Float32Array([1.0, -1.0]);
-    const df2 = YINCore.calculateDifferenceFunction(smallSignal);
+    const df2 = new Float32Array(smallSignal.length);
+    YINCore.calculateDifferenceFunction(smallSignal, df2);
     
     return {
         passed: df1.length === 1 && df1[0] === 0 && 
@@ -73,7 +75,8 @@ runTest('calculateDifferenceFunction - 境界条件テスト', () => {
 
 runTest('calculateDifferenceFunction - ゼロ信号処理', () => {
     const zeroSignal = new Float32Array(100).fill(0);
-    const df = YINCore.calculateDifferenceFunction(zeroSignal);
+    const df = new Float32Array(zeroSignal.length);
+    YINCore.calculateDifferenceFunction(zeroSignal, df);
     
     const allZero = df.every(val => val === 0);
     return {
@@ -84,7 +87,8 @@ runTest('calculateDifferenceFunction - ゼロ信号処理', () => {
 
 runTest('calculateDifferenceFunction - 数値オーバーフロー耐性', () => {
     const largeSignal = new Float32Array(100).fill(1e6);
-    const df = YINCore.calculateDifferenceFunction(largeSignal);
+    const df = new Float32Array(largeSignal.length);
+    YINCore.calculateDifferenceFunction(largeSignal, df);
     
     const allFinite = df.every(val => isFinite(val));
     const allNonNegative = df.every(val => val >= 0);
@@ -98,7 +102,8 @@ runTest('calculateDifferenceFunction - 数値オーバーフロー耐性', () =>
 runTest('calculateCMNDF - 数学的正確性', () => {
     // 既知の差分関数で検証
     const df = new Float32Array([0, 4, 1, 9, 2]);
-    const cmndf = YINCore.calculateCMNDF(df);
+    const cmndf = new Float32Array(df.length);
+    YINCore.calculateCMNDF(df, cmndf);
     
     // 手動計算: cmndf[1] = 4/(4/1) = 1, cmndf[2] = 1/((4+1)/2) = 0.4
     // cmndf[3] = 9/((4+1+9)/3) = 9/(14/3) = 27/14 ≈ 1.929
@@ -115,7 +120,8 @@ runTest('calculateCMNDF - 数学的正確性', () => {
 
 runTest('calculateCMNDF - ゼロ除算安全性', () => {
     const df = new Float32Array([0, 0, 0, 0]);
-    const cmndf = YINCore.calculateCMNDF(df);
+    const cmndf = new Float32Array(df.length);
+    YINCore.calculateCMNDF(df, cmndf);
     
     const allFinite = cmndf.every(val => isFinite(val));
     const firstIsOne = cmndf[0] === 1;
@@ -460,11 +466,12 @@ runTest('性能ベンチマーク - YIN基本アルゴリズム', () => {
     
     for (const bufferSize of bufferSizes) {
         const signal = YINTestUtils.generateSineWave(440, 44100, bufferSize / 44100);
+        const df = new Float32Array(signal.length);
         
         // 基本版の性能測定
         const start = performance.now();
         for (let i = 0; i < 100; i++) {
-            YINCore.calculateDifferenceFunction(signal);
+            YINCore.calculateDifferenceFunction(signal, df);
         }
         const time = performance.now() - start;
         const avgTime = time / 100;

@@ -56,7 +56,8 @@ log(''.padEnd(50, '='), colors.blue);
 
 runTest('差分関数計算 - 440Hz正弦波', () => {
     const signal = YINTestUtils.generateSineWave(440, 44100, 0.1);
-    const df = YINCore.calculateDifferenceFunction(signal);
+    const df = new Float32Array(signal.length);
+    YINCore.calculateDifferenceFunction(signal, df);
     const expectedPeriod = Math.round(44100 / 440);
     
     // 期待周期付近での最小値を検索
@@ -78,8 +79,10 @@ runTest('差分関数計算 - 440Hz正弦波', () => {
 
 runTest('CMNDF計算', () => {
     const signal = YINTestUtils.generateSineWave(440, 44100, 0.1);
-    const df = YINCore.calculateDifferenceFunction(signal);
-    const cmndf = YINCore.calculateCMNDF(df);
+    const df = new Float32Array(signal.length);
+    YINCore.calculateDifferenceFunction(signal, df);
+    const cmndf = new Float32Array(df.length);
+    YINCore.calculateCMNDF(df, cmndf);
     
     const isValid = cmndf[0] === 1 && 
                    cmndf.length === df.length && 

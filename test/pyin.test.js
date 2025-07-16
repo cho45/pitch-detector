@@ -71,8 +71,10 @@ runTest('ピッチ状態生成テスト', () => {
 
 runTest('複数閾値候補抽出テスト', () => {
     const signal = YINTestUtils.generateSineWave(220, 44100, 0.1);
-    const df = PYINCore.calculateDifferenceFunction(signal);
-    const cmndf = PYINCore.calculateCMNDF(df);
+    const df = new Float32Array(signal.length);
+    const cmndf = new Float32Array(signal.length);
+    PYINCore.calculateDifferenceFunction(signal, df);
+    PYINCore.calculateCMNDF(df, cmndf);
     const candidates = PYINCore.extractMultipleCandidates(cmndf, 44100);
     
     const expectedFreq = 220;
@@ -86,9 +88,11 @@ runTest('複数閾値候補抽出テスト', () => {
 
 runTest('ピッチ確率分布計算テスト', () => {
     const signal = YINTestUtils.generateSineWave(440, 44100, 0.1);
-    const df = PYINCore.calculateDifferenceFunction(signal);
-    const cmndf = PYINCore.calculateCMNDF(df);
-    const candidates = PYINCore.extractMultipleCandidates(cmndf);
+    const df = new Float32Array(signal.length);
+    const cmndf = new Float32Array(signal.length);
+    PYINCore.calculateDifferenceFunction(signal, df);
+    PYINCore.calculateCMNDF(df, cmndf);
+    const candidates = PYINCore.extractMultipleCandidates(cmndf, 44100);
     const probabilities = PYINCore.calculatePitchProbabilities(candidates, cmndf, 44100);
     
     const totalProb = probabilities.reduce((sum, p) => sum + p.probability, 0);
