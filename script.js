@@ -141,7 +141,7 @@ Vue.createApp({
 			selectedName: "CDEFGAB",
 
 			// YIN/Pitchy algorithm selection
-			pitchAlgorithm: "yin", // "pitchy", "yin", or "pyin"
+			pitchAlgorithm: "pyin", // "pitchy", "yin", or "pyin"
 
 			// AGC settings
 			agcEnabled: true,
@@ -467,7 +467,6 @@ Vue.createApp({
 			const scopeHeight = this.$refs.scope.height;
 			console.log({scopeWidth, scopeHeight});
 
-			const dataArray = new Uint8Array(analyser.frequencyBinCount);
 			const audioData = new Float32Array(analyser.fftSize);
 			
 			// Performance monitoring
