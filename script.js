@@ -472,6 +472,7 @@ Vue.createApp({
 			
 			// Performance monitoring
 			let frameCount = 0;
+			let totalPitchTime = 0;
 			
 			const draw = () => {
 				// Stop animation loop if audio context is closed
@@ -491,12 +492,14 @@ Vue.createApp({
 					const pitchStart = performance.now();
 					const [freq, clarity] = detector.findPitch(audioData.subarray(start, start + PART_LENGTH), sampleRate);
 					const pitchTime = performance.now() - pitchStart;
-					
+					totalPitchTime += pitchTime;
 					frameCount++;
 					
 					// Log performance every 100 frames
 					if (frameCount % 100 === 0) {
-						console.log(`📊 ${this.detector.constructor.name} avg detection time: ${pitchTime.toFixed(3)}ms/frame`);
+						console.log(`📊 ${this.detector.constructor.name} avg detection time: ${(totalPitchTime / frameCount).toFixed(3)}ms/frame`);
+						frameCount = 0;
+						totalPitchTime = 0;
 					}
 
 					const note = this.hzToNote(freq);
