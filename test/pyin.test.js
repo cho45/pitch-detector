@@ -246,6 +246,63 @@ runTest('PYINノイズ耐性テスト', () => {
     };
 });
 
+log(`
+${colors.bright}${colors.blue}🧪 Stream Processing Tests (Stateful HMM)${colors.reset}`);
+log(''.padEnd(50, '='), colors.blue);
+
+runTest('HMM状態引き継ぎテスト', () => {
+    const detector = new PYINDetector(44100, 2048);
+    const frame = YINTestUtils.generateSineWave(330, 44100, 2048 / 44100);
+    const results = [];
+    for (let i = 0; i < 5; i++) {
+        results.push(detector.findPitch(frame));
+    }
+    const frequencies = results.map(r => r[0]);
+    const allConsistent = frequencies.every(f => Math.abs(f - 330) < 10);
+
+    return {
+        passed: allConsistent,
+        details: `検出された周波数: [${frequencies.map(f => f.toFixed(1)).join(', ')}]`
+    };
+});
+
+runTest('HMM平滑化効果テスト（ノイズ挿入）', () => {
+    const detector = new PYINDetector(44100, 2048, 80, 1000);
+    const goodFrame = YINTestUtils.generateSineWave(261.6, 44100, 2048/44100); // C4
+    const noiseFrame = YINTestUtils.addNoise(new Float32Array(2048), 0.8);
+    const frames = [goodFrame, goodFrame, noiseFrame, goodFrame, goodFrame];
+    
+    const frequencies = frames.map(frame => detector.findPitch(frame)[0]);
+    
+    // 3フレーム目（ノイズ）が、直前の周波数に近いか、無声(0)になっていることを期待
+    const smoothed = Math.abs(frequencies[2] - 261.6) < 20 || frequencies[2] === 0;
+
+    return {
+        passed: smoothed,
+        details: `周波数系列: [${frequencies.map(f => f.toFixed(1)).join(', ')}]`
+    };
+});
+
+runTest('reset()機能テスト', () => {
+    const detector = new PYINDetector(44100, 2048);
+    const frame = YINTestUtils.generateSineWave(440, 44100, 2048 / 44100);
+    
+    const result1_run1 = detector.findPitch(frame);
+    const result2_run1 = detector.findPitch(frame);
+
+    detector.reset();
+
+    const result1_run2 = detector.findPitch(frame);
+
+    // reset()後は、最初の呼び出し結果が再現されるはず
+    const isResetCorrectly = Math.abs(result1_run1[0] - result1_run2[0]) < 0.1 && Math.abs(result1_run1[1] - result1_run2[1]) < 0.1;
+
+    return {
+        passed: isResetCorrectly,
+        details: `Run1-1: ${result1_run1[0].toFixed(1)}Hz, Run2-1: ${result1_run2[0].toFixed(1)}Hz`
+    };
+});
+
 // 性能テスト
 log(`\n${colors.bright}${colors.blue}⚡ Performance Tests${colors.reset}`);
 log(''.padEnd(50, '='), colors.blue);
