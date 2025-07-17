@@ -169,17 +169,42 @@ runTest('ビタビアルゴリズムテスト', () => {
 log(`\n${colors.bright}${colors.blue}🎯 Integration Tests${colors.reset}`);
 log(''.padEnd(50, '='), colors.blue);
 
-runTest('PYIN単一フレーム検出テスト', () => {
+runTest('PYIN単一フレーム検出テスト（正弦波）', () => {
     const detector = new PYINDetector(44100, 2048);
     const signal = YINTestUtils.generateSineWave(440, 44100, 2048 / 44100);
     
-    // Test single frame detection using findPitch method
     const [frequency, confidence] = detector.findPitch(signal);
-    const error = frequency > 0 ? Math.abs(frequency - 440) / 440 * 100 : 100;
+    const error = Math.abs(frequency - 440);
     
     return {
-        passed: frequency > 200 && frequency < 800, // PYIN should detect in reasonable range
-        details: `期待: 440Hz, 検出: ${frequency.toFixed(1)}Hz, 誤差: ${error.toFixed(2)}%`
+        passed: error < 5, // 5Hz未満の誤差
+        details: `期待: 440Hz, 検出: ${frequency.toFixed(1)}Hz, 誤差: ${error.toFixed(2)}Hz`
+    };
+});
+
+runTest('PYIN無声（ノイズ）入力テスト', () => {
+    const detector = new PYINDetector(44100, 2048);
+    const noisySignal = YINTestUtils.addNoise(new Float32Array(2048), 1.0);
+    
+    const [frequency, confidence] = detector.findPitch(noisySignal);
+    
+    return {
+        passed: frequency === 0 && confidence === 0,
+        details: `検出周波数: ${frequency}, 信頼度: ${confidence}`
+    };
+});
+
+runTest('PYINオクターブエラーテスト（矩形波）', () => {
+    const detector = new PYINDetector(44100, 2048, 80, 1000);
+    const signal = YINTestUtils.generateSquareWave(220, 44100, 2048 / 44100);
+    
+    const [frequency, confidence] = detector.findPitch(signal);
+    const error = Math.abs(frequency - 220);
+    const isOctaveError = Math.abs(frequency - 440) < 10 || Math.abs(frequency - 660) < 15;
+
+    return {
+        passed: error < 10 && !isOctaveError,
+        details: `期待: 220Hz, 検出: ${frequency.toFixed(1)}Hz. オクターブエラー発生: ${isOctaveError}`
     };
 });
 
@@ -213,11 +238,11 @@ runTest('PYINノイズ耐性テスト', () => {
     const noisySignal = YINTestUtils.addNoise(cleanSignal, 0.2);
     
     const [frequency, confidence] = detector.findPitch(noisySignal);
-    const error = frequency > 0 ? Math.abs(frequency - 440) / 440 * 100 : 100;
+    const error = Math.abs(frequency - 440);
     
     return {
-        passed: frequency > 200 && frequency < 800,
-        details: `ノイズ入り検出: ${frequency.toFixed(1)}Hz, 誤差: ${error.toFixed(2)}%`
+        passed: error < 10, // 10Hz未満の誤差
+        details: `ノイズ入り検出: ${frequency.toFixed(1)}Hz, 誤差: ${error.toFixed(2)}Hz`
     };
 });
 

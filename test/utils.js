@@ -72,4 +72,24 @@ export class YINTestUtils {
         
         return noisySignal;
     }
+
+    /**
+     * Generate a square wave for testing octave errors
+     * @param {number} frequency - Frequency in Hz
+     * @param {number} sampleRate - Sample rate in Hz
+     * @param {number} duration - Duration in seconds
+     * @param {number} amplitude - Amplitude (0-1)
+     * @returns {Float32Array} Generated square wave
+     */
+    static generateSquareWave(frequency, sampleRate, duration, amplitude = 0.5) {
+        const length = Math.floor(sampleRate * duration);
+        const buffer = new Float32Array(length);
+        const period = sampleRate / frequency;
+
+        for (let i = 0; i < length; i++) {
+            buffer[i] = (i % period) < (period / 2) ? amplitude : -amplitude;
+        }
+
+        return buffer;
+    }
 }
