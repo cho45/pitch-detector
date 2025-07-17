@@ -2,6 +2,7 @@
 import { PitchDetector } from "./lib/pitchy.mjs";
 import { YINDetector, createYINDetector } from "./lib/yin.js";
 import { PYINDetector, createPYINDetector } from "./lib/pyin.js";
+import { MPMDetector, createMPMDetector } from "./lib/mpm.js";
 
 /**
  * AGC AudioWorklet Node Wrapper
@@ -140,8 +141,8 @@ Vue.createApp({
 			down: false,
 			selectedName: "CDEFGAB",
 
-			// YIN/Pitchy algorithm selection
-			pitchAlgorithm: "pyin", // "pitchy", "yin", or "pyin"
+			// Pitch detection algorithm selection
+			pitchAlgorithm: "pyin", // "pitchy", "yin", "pyin", or "mpm"
 
 			// AGC settings
 			agcEnabled: true,
@@ -600,6 +601,9 @@ Vue.createApp({
 			} else if (this.pitchAlgorithm === 'pyin') {
 				this.detector = new PYINDetector(sampleRate, PART_LENGTH);
 				console.log('🎵 Using PYIN pitch detection algorithm');
+			} else if (this.pitchAlgorithm === 'mpm') {
+				this.detector = new MPMDetector(sampleRate, PART_LENGTH, 0.93);
+				console.log('🎵 Using MPM pitch detection algorithm');
 			} else {
 				this.detector = PitchDetector.forFloat32Array(PART_LENGTH);
 				console.log('🎵 Using Pitchy pitch detection algorithm');
