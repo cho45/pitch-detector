@@ -224,7 +224,8 @@ Vue.createApp({
 
 		pitchAlgorithm() {
 			console.log(`🔄 Switching to ${this.pitchAlgorithm} algorithm`);
-			// Note: Detector will be recreated on next start() call
+			// Immediately recreate detector if audio context is available
+			this.initDetector();
 		},
 
 		agcTargetLevel() {
@@ -458,18 +459,8 @@ Vue.createApp({
 			const PART_LENGTH = analyser.fftSize / PART;
 			const sampleRate = this.audioContext.sampleRate;
 			
-			// Create detector based on selected algorithm
-			let detector;
-			if (this.pitchAlgorithm === 'yin') {
-				detector = new YINDetector(sampleRate, PART_LENGTH, 0.2);
-				console.log('🎵 Using YIN pitch detection algorithm');
-			} else if (this.pitchAlgorithm === 'pyin') {
-				detector = new PYINDetector(sampleRate, PART_LENGTH);
-				console.log('🎵 Using PYIN pitch detection algorithm');
-			} else {
-				detector = PitchDetector.forFloat32Array(PART_LENGTH);
-				console.log('🎵 Using Pitchy pitch detection algorithm');
-			}
+			// Initialize detector with current algorithm
+			this.initDetector();
 
 			const scopeCtx = this.$refs.scope.getContext("2d");
 			const scopeWidth = this.$refs.scope.width;
@@ -481,7 +472,6 @@ Vue.createApp({
 			
 			// Performance monitoring
 			let frameCount = 0;
-			let totalPitchTime = 0;
 			
 			const draw = () => {
 				// Stop animation loop if audio context is closed
@@ -493,6 +483,7 @@ Vue.createApp({
 				
 				// Note: AGC processing is now handled by AudioWorkletNode in real-time
 
+				let detector = this.detector;
 				for (let p = 0; p < PART; p++) {
 					const start = PART_LENGTH * p;
 					
@@ -501,13 +492,11 @@ Vue.createApp({
 					const [freq, clarity] = detector.findPitch(audioData.subarray(start, start + PART_LENGTH), sampleRate);
 					const pitchTime = performance.now() - pitchStart;
 					
-					totalPitchTime += pitchTime;
 					frameCount++;
 					
 					// Log performance every 100 frames
 					if (frameCount % 100 === 0) {
-						const avgTime = totalPitchTime / frameCount;
-						console.log(`📊 ${detector.constructor.name} avg detection time: ${avgTime.toFixed(3)}ms/frame`);
+						console.log(`📊 ${this.detector.constructor.name} avg detection time: ${pitchTime.toFixed(3)}ms/frame`);
 					}
 
 					const note = this.hzToNote(freq);
@@ -569,6 +558,7 @@ Vue.createApp({
 				await this.audioContext.close();
 				this.audioContext = null;
 				this.agc = null;
+				this.detector = null;
 				this.status = "Tap to start";
 				console.log('🛑 Audio context stopped');
 				
@@ -584,6 +574,36 @@ Vue.createApp({
 				console.log('resize');
 				this.initCanvas();
 			}, 250);
+		},
+
+		// Pitch detector initialization
+		initDetector: function() {
+			if (!this.audioContext) {
+				console.log('🔄 AudioContext not available, detector will be initialized on start');
+				return;
+			}
+			
+			const PART_LENGTH = 4096 / 4; // Same as in start() method
+			const sampleRate = this.audioContext.sampleRate;
+			
+			// Clean up existing detector if any
+			if (this.detector) {
+				console.log('🔄 Replacing existing detector:', this.detector.constructor.name);
+			}
+			
+			// Create detector based on selected algorithm
+			if (this.pitchAlgorithm === 'yin') {
+				this.detector = new YINDetector(sampleRate, PART_LENGTH, 0.2);
+				console.log('🎵 Using YIN pitch detection algorithm');
+			} else if (this.pitchAlgorithm === 'pyin') {
+				this.detector = new PYINDetector(sampleRate, PART_LENGTH);
+				console.log('🎵 Using PYIN pitch detection algorithm');
+			} else {
+				this.detector = PitchDetector.forFloat32Array(PART_LENGTH);
+				console.log('🎵 Using Pitchy pitch detection algorithm');
+			}
+			
+			console.log('🔄 Detector initialized:', this.detector.constructor.name);
 		},
 
 		// UI visibility control methods
