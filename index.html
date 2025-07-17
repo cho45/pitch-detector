@@ -52,6 +52,7 @@
 				box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 				color: #333;
 				font-weight: 500;
+				transition: opacity 0.5s ease;
 			}
 
 			#options {
@@ -65,6 +66,7 @@
 				box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 				backdrop-filter: blur(10px);
 				min-width: 200px;
+				transition: opacity 0.5s ease;
 			}
 
 			#options p {
@@ -190,6 +192,7 @@
 				left: 50%;
 				transform: translateX(-50%);
 				text-align: center;
+				transition: opacity 0.5s ease;
 			}
 
 			.control-buttons button {
@@ -252,8 +255,8 @@
 					<div class="freq">{{ targetFreq.toFixed(1) }} Hz</div>
 				</div>
 			</div>
-			<div id="status">{{status}}</div>
-			<div class="control-buttons">
+			<div id="status" :style="{ opacity: uiVisible ? 1 : 0 }">{{status}}</div>
+			<div class="control-buttons" :style="{ opacity: uiVisible ? 1 : 0 }">
 				<button v-if="audioContext" type="button" @click="stop" class="stop-btn">
 					Stop Recording
 				</button>
@@ -261,7 +264,7 @@
 					Start Recording
 				</button>
 			</div>
-			<div id="options">
+			<div id="options" :style="{ opacity: uiVisible ? 1 : 0 }">
 				<div style="text-align: right">
 					<div @click="openSetting = !openSetting" class="setting-toggle">
 						<span v-if="!openSetting">

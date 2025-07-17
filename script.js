@@ -151,6 +151,10 @@ Vue.createApp({
 
 			openSetting: false,
 
+			// UI visibility control
+			uiVisible: true,
+			uiHideTimer: null,
+
 			noteName: [
 				{
 					name: "CDEFGAB",
@@ -254,7 +258,8 @@ Vue.createApp({
 					console.log('🎚️ AGC enabled parameter updated in real-time');
 				}
 			}
-		}
+		},
+
 	},
 
 	mounted() {
@@ -264,6 +269,30 @@ Vue.createApp({
 		window.addEventListener('resize', () => {
 			this.resize();
 		});
+		
+		// Add global event listeners for UI interaction
+		this.handleMouseMove = () => {
+			this.onUIInteraction();
+		};
+		
+		this.handleTouchStart = () => {
+			this.onUIInteraction();
+		};
+		
+		document.body.addEventListener('mousemove', this.handleMouseMove);
+		document.body.addEventListener('touchstart', this.handleTouchStart);
+		console.log('Global UI interaction listeners added');
+	},
+	
+	beforeUnmount() {
+		// Remove global event listeners
+		if (this.handleMouseMove) {
+			document.body.removeEventListener('mousemove', this.handleMouseMove);
+		}
+		if (this.handleTouchStart) {
+			document.body.removeEventListener('touchstart', this.handleTouchStart);
+		}
+		console.log('Global UI interaction listeners removed');
 	},
 
 	methods: {
@@ -373,6 +402,7 @@ Vue.createApp({
 		start: async function () {
 			if (this.audioContext) return;
 
+			console.log('Recording started');
 			this.status = "Recording";
 			this.audioContext = new AudioContext({
 				latencyHint: 'interactive',
@@ -477,7 +507,7 @@ Vue.createApp({
 					// Log performance every 100 frames
 					if (frameCount % 100 === 0) {
 						const avgTime = totalPitchTime / frameCount;
-						console.log(`📊 ${this.pitchAlgorithm.toUpperCase()} avg detection time: ${avgTime.toFixed(3)}ms/frame`);
+						console.log(`📊 ${detector.constructor.name} avg detection time: ${avgTime.toFixed(3)}ms/frame`);
 					}
 
 					const note = this.hzToNote(freq);
@@ -528,15 +558,23 @@ Vue.createApp({
 				requestAnimationFrame(draw);
 			};
 			requestAnimationFrame(draw);
+			
+			// Ensure UI hide timer starts after recording begins
+			this.startUIHideTimer();
 		},
 
 		stop: async function() {
+			console.log('Stop called');
 			if (this.audioContext) {
 				await this.audioContext.close();
 				this.audioContext = null;
 				this.agc = null;
 				this.status = "Tap to start";
 				console.log('🛑 Audio context stopped');
+				
+				// Show UI and clear timer when recording stops
+				this.showUI();
+				this.clearUIHideTimer();
 			}
 		},
 
@@ -546,6 +584,41 @@ Vue.createApp({
 				console.log('resize');
 				this.initCanvas();
 			}, 250);
+		},
+
+		// UI visibility control methods
+		startUIHideTimer: function() {
+			this.clearUIHideTimer();
+			this.uiHideTimer = setTimeout(() => {
+				this.hideUI();
+			}, 3000); // Hide after 3 seconds
+		},
+
+		clearUIHideTimer: function() {
+			if (this.uiHideTimer) {
+				clearTimeout(this.uiHideTimer);
+				this.uiHideTimer = null;
+			}
+		},
+
+		hideUI: function() {
+			if (this.audioContext) {
+				this.uiVisible = false;
+				console.log('UI hidden');
+			}
+		},
+
+		showUI: function() {
+			this.uiVisible = true;
+			if (this.audioContext) {
+				this.startUIHideTimer();
+			}
+		},
+
+		onUIInteraction: function() {
+			if (this.audioContext) {
+				this.showUI();
+			}
 		}
 	}
 }).mount("#app");
