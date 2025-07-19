@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html>
 	<head>
 		<meta charset="utf-8">
@@ -59,14 +60,18 @@
 				position: absolute;
 				bottom: 10px;
 				right: 10px;
-				background: rgba(255, 255, 255, 0.95);
-				padding: 15px;
+				padding: 15px 0;
 				font-size: 14px;
 				border-radius: 15px;
 				box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 				backdrop-filter: blur(10px);
 				min-width: 200px;
 				transition: opacity 0.5s ease;
+			}
+
+			#options.open {
+				background: rgba(255, 255, 255, 0.95);
+				padding: 15px;
 			}
 
 			#options p {
@@ -255,8 +260,8 @@
 					<div class="freq">{{ targetFreq.toFixed(1) }} Hz</div>
 				</div>
 			</div>
-			<div id="status" :style="{ opacity: uiVisible ? 1 : 0 }">{{status}}</div>
-			<div class="control-buttons" :style="{ opacity: uiVisible ? 1 : 0 }">
+			<div id="status" :style="{ opacity: uiVisible ? 1 : 0.0 }">{{status}}</div>
+			<div class="control-buttons" :style="{ opacity: uiVisible ? 1 : 0.0 }">
 				<button v-if="audioContext" type="button" @click="stop" class="stop-btn">
 					Stop Recording
 				</button>
@@ -264,7 +269,7 @@
 					Start Recording
 				</button>
 			</div>
-			<div id="options" :style="{ opacity: uiVisible ? 1 : 0 }">
+			<div id="options" :class="{ open: openSetting }" :style="{ opacity: uiVisible ? 1 : 0.0 }">
 				<div style="text-align: right">
 					<div @click="openSetting = !openSetting" class="setting-toggle">
 						<span v-if="!openSetting">
@@ -339,7 +344,6 @@
 							<option value="pitchy">Pitchy (Autocorr + NSDF)</option>
 							<option value="yin">YIN (Difference Function)</option>
 							<option value="pyin">PYIN (Probabilistic YIN + HMM)</option>
-							<option value="mpm">MPM (McLeod Pitch Method)</option>
 						</select>
 					</p>
 					<p>
