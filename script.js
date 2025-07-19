@@ -4,6 +4,13 @@ import { YINDetector, createYINDetector } from "./lib/yin.js";
 import { PYINDetector, createPYINDetector } from "./lib/pyin.js";
 import { MPMDetector, createMPMDetector } from "./lib/mpm.js";
 
+// 音域制限の定数
+const PRACTICAL_MIN_NOTE = 24;  // C1
+const PRACTICAL_MAX_NOTE = 96;  // C7
+const NOTE_RANGE = 24;          // 表示幅
+const SMOOTHING_FACTOR = 0.05;  // 移動の滑らかさ
+const REDRAW_THRESHOLD = 2;   // 再描画の閾値
+
 /**
  * AGC AudioWorklet Node Wrapper
  * Manages AudioWorkletNode for real-time automatic gain control
@@ -125,8 +132,10 @@ Vue.createApp({
 			// center A is note number 69 and 440Hz
 			freqOfA4 : 440,
 			// 88 keys = A0(21) - C8(108)
-			startNote : 60 - 24,
-			endNote: 60 + 24,
+			centerNote: 60,           // 表示範囲の中心
+			lastDrawnCenterNote: 60,  // 再描画判定用
+			pitchHistory: [],         // ピッチ履歴 [{note, clarity}, ...]
+			maxHistoryLength: 250,    // canvas幅/4 (初期値)
 
 			scale: "0,major",
 
@@ -196,6 +205,14 @@ Vue.createApp({
 	},
 
 	computed: {
+		startNote() {
+			return Math.floor(this.centerNote - NOTE_RANGE / 2);
+		},
+		
+		endNote() {
+			return Math.floor(this.centerNote + NOTE_RANGE / 2);
+		},
+		
 		noteLength() {
 			return this.endNote - this.startNote;
 		},
@@ -399,6 +416,9 @@ Vue.createApp({
 			this.$refs.graph.width = width;
 			this.$refs.graph.height = height;
 			this.graphCtx = this.$refs.graph.getContext('2d');
+			
+			// maxHistoryLengthをcanvas幅から計算
+			this.maxHistoryLength = Math.floor(width / 4); // 4ピクセルごとに1点
 		},
 
 		start: async function () {
@@ -504,9 +524,36 @@ Vue.createApp({
 
 					const note = this.hzToNote(freq);
 					// console.log({clarity, freq, note});
+					
+					// ピッチ履歴に追加
+					this.pitchHistory.push({ note, clarity });
+					if (this.pitchHistory.length > this.maxHistoryLength) {
+						this.pitchHistory.shift();
+					}
+					
+					// centerNoteの更新（clarity が高い場合のみ）
+					if (clarity > 0.9 && freq > 0) {
+						const targetCenter = Math.round(note);
+						// クランプ処理
+						const minCenter = PRACTICAL_MIN_NOTE + NOTE_RANGE / 2;
+						const maxCenter = PRACTICAL_MAX_NOTE - NOTE_RANGE / 2;
+						const clampedTarget = Math.max(minCenter, Math.min(maxCenter, targetCenter));
+						
+						// スムーズな移動
+						this.centerNote += (clampedTarget - this.centerNote) * SMOOTHING_FACTOR;
+						
+						// 音域変更時の処理
+						if (Math.abs(this.centerNote - this.lastDrawnCenterNote) > REDRAW_THRESHOLD) {
+							this.initCanvas();  // mainCanvas再描画
+							this.redrawGraphCanvas();  // graphCanvas再描画
+							this.lastDrawnCenterNote = this.centerNote;
+							continue; // 再描画したので個別の点描画はスキップ
+						}
+					}
+					
 					const y = this.mainHeight / this.noteLength * (this.noteLength - (note - this.startNote));
 
-					// draw dot
+					// draw dot (音域が変更されていない場合のみ)
 					this.graphCtx.drawImage(
 						this.$refs.graph,
 						// source
@@ -564,6 +611,11 @@ Vue.createApp({
 				this.detector = null;
 				this.status = "Tap to start";
 				console.log('🛑 Audio context stopped');
+				
+				// ピッチ履歴をクリア
+				this.pitchHistory = [];
+				this.centerNote = 60;
+				this.lastDrawnCenterNote = 60;
 				
 				// Show UI and clear timer when recording stops
 				this.showUI();
@@ -645,6 +697,27 @@ Vue.createApp({
 			if (this.audioContext) {
 				this.showUI();
 			}
+		},
+
+		redrawGraphCanvas: function() {
+			// キャンバスをクリア
+			this.graphCtx.fillStyle = "#000000";
+			this.graphCtx.fillRect(0, 0, this.mainWidth, this.mainHeight);
+			
+			// 履歴から再描画
+			const pointWidth = 4;
+			const startX = this.mainWidth - this.pitchHistory.length * pointWidth;
+			
+			this.pitchHistory.forEach((data, index) => {
+				const y = this.mainHeight / this.noteLength * 
+						  (this.noteLength - (data.note - this.startNote));
+				const x = startX + index * pointWidth;
+				
+				if (x >= 0) { // 画面内の点のみ描画
+					this.graphCtx.fillStyle = `rgba(255, 0, 0, ${data.clarity})`;
+					this.graphCtx.fillRect(x, y - 4, 8, 8);
+				}
+			});
 		}
 	}
 }).mount("#app");
