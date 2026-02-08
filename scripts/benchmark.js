@@ -1,9 +1,9 @@
 
-import { PitchDetector } from "./lib/pitchy.js";
-import { YINDetector } from "./lib/yin.js";
-import { PYINDetector } from "./lib/pyin.js";
-import { MPMDetector } from "./lib/mpm.js";
-import { YINTestUtils } from "./test/utils.js";
+import { PitchDetector } from "../lib/pitchy.js";
+import { YINDetector } from "../lib/yin.js";
+import { PYINDetector } from "../lib/pyin.js";
+import { MPMDetector } from "../lib/mpm.js";
+import { YINTestUtils } from "../test/utils.js";
 
 const SAMPLE_RATE = 44100;
 const BUFFER_SIZES = [1024, 2048, 4096];
