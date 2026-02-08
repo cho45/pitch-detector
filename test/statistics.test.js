@@ -56,13 +56,13 @@ describe('Beta distribution CDF', () => {
 
     test('Beta(2,18) closed form accuracy', () => {
         // Test the optimized closed form for Beta(2,18)
-        // CDF(x) = 1 - (1-x)^18 * (1 + 17*x)
+        // CDF(x) = 1 - (1-x)^18 * (1 + 18*x)
         const testPoints = [0.1, 0.2, 0.3, 0.5, 0.8];
 
         testPoints.forEach(x => {
             const actual = betaCdf(x, 2, 18);
             const oneMinusX = 1 - x;
-            const expected = 1 - Math.pow(oneMinusX, 18) * (1 + 17 * x);
+            const expected = 1 - Math.pow(oneMinusX, 18) * (1 + 18 * x);
             assertApproxEqual(actual, expected, 1e-14);
         });
     });
