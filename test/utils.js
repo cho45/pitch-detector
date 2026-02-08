@@ -92,4 +92,24 @@ export class YINTestUtils {
 
         return buffer;
     }
+
+    /**
+     * Create a pre-allocated context for PYIN tests
+     */
+    static createPYINContext(sampleRate, frameSize, nThresholds = 50) {
+        return {
+            nThresholds: nThresholds,
+            thresholds: new Float32Array(nThresholds + 1).map((_, i) => i / nThresholds),
+            betaProbs: new Float32Array(nThresholds).map((_, i) => {
+                const betaCdf = (x) => 1 - Math.pow(1 - x, 18) * (1 + 18 * x);
+                return betaCdf((i + 1) / nThresholds) - betaCdf(i / nThresholds);
+            }),
+            minTau: Math.max(1, Math.floor(sampleRate / 800)),
+            maxTau: Math.min(frameSize - 1, Math.ceil(sampleRate / 80)),
+            troughTau: new Int32Array(200),
+            troughVal: new Float32Array(200),
+            troughProbBuf: new Float32Array(200),
+            candidates: Array(100).fill(0).map(() => ({ frequency: 0, probability: 0 }))
+        };
+    }
 }
