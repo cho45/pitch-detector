@@ -77,7 +77,9 @@ describe('PYIN Algorithm Test Suite', () => {
             // シナリオ1: クリアなピッチ候補が存在する場合
             const candidates = [{ frequency: 440, probability: 0.9 }];
             const logProbs1 = new Float32Array(states.length);
-            PYINCore.fillObservationLogProbabilities(states, candidates, 1, logProbs1, stepsPerSemitone);
+            const candLogProbs = new Float32Array(1);
+            const candLogFreqs = new Float32Array(1);
+            PYINCore.fillObservationLogProbabilities(states, candidates, 1, logProbs1, stepsPerSemitone, candLogProbs, candLogFreqs);
             
             // 無声尤度は、解像度独立な密度補正 log(1 - voicingProb) と一致すべき。
             const expectedUnvoicedLog1 = Math.log(1 - 0.9);
@@ -86,7 +88,7 @@ describe('PYIN Algorithm Test Suite', () => {
 
             // シナリオ2: 候補が存在しない場合
             const logProbs2 = new Float32Array(states.length);
-            PYINCore.fillObservationLogProbabilities(states, [], 0, logProbs2, stepsPerSemitone);
+            PYINCore.fillObservationLogProbabilities(states, [], 0, logProbs2, stepsPerSemitone, candLogProbs, candLogFreqs);
             
             const expectedUnvoicedLog2 = Math.log(1.0);
             assert(Math.abs(logProbs2[unvoicedStateIndex] - expectedUnvoicedLog2) < 1e-6);
@@ -96,17 +98,19 @@ describe('PYIN Algorithm Test Suite', () => {
             const minFreq = 200;
             const maxFreq = 600;
             const candidates = [{ frequency: 440, probability: 0.5 }]; 
+            const candLogProbs = new Float32Array(1);
+            const candLogFreqs = new Float32Array(1);
 
             // 低解像度（1ステップ/半音）
             const statesLow = PYINCore.createPitchStates(minFreq, maxFreq, 1);
             const logProbsLow = new Float32Array(statesLow.length);
-            PYINCore.fillObservationLogProbabilities(statesLow, candidates, 1, logProbsLow, 1);
+            PYINCore.fillObservationLogProbabilities(statesLow, candidates, 1, logProbsLow, 1, candLogProbs, candLogFreqs);
             const unvoicedLogLow = logProbsLow[statesLow.findIndex(s => !s.voiced)];
 
             // 高解像度（10ステップ/半音）
             const statesHigh = PYINCore.createPitchStates(minFreq, maxFreq, 10);
             const logProbsHigh = new Float32Array(statesHigh.length);
-            PYINCore.fillObservationLogProbabilities(statesHigh, candidates, 1, logProbsHigh, 10);
+            PYINCore.fillObservationLogProbabilities(statesHigh, candidates, 1, logProbsHigh, 10, candLogProbs, candLogFreqs);
             const unvoicedLogHigh = logProbsHigh[statesHigh.findIndex(s => !s.voiced)];
 
             // 密度補正により、ピッチビンの密度に関わらず、無声尤度が積分的に一定（log(0.5)）であることを確認。
