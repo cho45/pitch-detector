@@ -3,11 +3,13 @@ import { test, expect } from '@playwright/test';
 test.describe('Settings UI', () => {
 	test.beforeEach(async ({ page }) => {
 		await page.goto('/');
+		await page.evaluate(() => localStorage.clear());
+		await page.reload();
 	});
 	test('should open and close settings menu', async ({ page }) => {
 		const settingsBtn = page.locator('.settings-btn');
 		const dialog = page.locator('#settings-dialog');
-		const closeBtn = page.locator('.close-dialog-btn');
+		const closeBtn = page.locator('button:has-text("✕ 閉じる"), button:has-text("✕ Close")');
 
 		// Initially closed
 		await expect(dialog).not.toBeVisible();
@@ -46,7 +48,7 @@ test.describe('Settings UI', () => {
 		await expect(algoSelect).toHaveValue('mpm');
 
 		// Close settings to interact with the main UI
-		await page.locator('.close-dialog-btn').click();
+		await page.locator('button:has-text("✕ 閉じる"), button:has-text("✕ Close")').click();
 
 		// Start recording and check if it still works (using console log check)
 		const consoleMessages = [];
@@ -81,6 +83,6 @@ test.describe('Settings UI', () => {
 		await expect(agcSettings).not.toBeVisible();
 
 		// Clean up: close dialog
-		await page.locator('.close-dialog-btn').click();
+		await page.locator('button:has-text("✕ 閉じる"), button:has-text("✕ Close")').click();
 	});
 });

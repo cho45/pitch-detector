@@ -3,6 +3,8 @@ import { test, expect } from '@playwright/test';
 test.describe('Internationalization', () => {
 	test.beforeEach(async ({ page }) => {
 		await page.goto('/');
+		await page.evaluate(() => localStorage.clear());
+		await page.reload();
 	});
 
 	test('should detect browser language and switch languages', async ({ page }) => {
@@ -29,6 +31,6 @@ test.describe('Internationalization', () => {
 		await expect(page.locator('label[for="options-scope"]')).toHaveText(/Scope/);
 
 		// Clean up
-		await page.locator('.close-dialog-btn').click();
+		await page.locator('button:has-text("✕ 閉じる"), button:has-text("✕ Close")').click();
 	});
 });

@@ -275,6 +275,21 @@ Vue.createApp({
 		},
 	},
 
+	created() {
+		this.loadSettings();
+		// Watch all setting properties and save to localStorage
+		const settingsToWatch = [
+			'freqOfA4', 'startNote', 'endNote', 'scale', 'showScope',
+			'selectedName', 'pitchAlgorithm', 'agcEnabled',
+			'agcTargetLevel', 'agcAttackTime', 'agcReleaseTime'
+		];
+		settingsToWatch.forEach(prop => {
+			this.$watch(prop, () => {
+				this.saveSettings();
+			});
+		});
+	},
+
 	mounted() {
 		console.log("mounted");
 		this.initCanvas();
@@ -697,6 +712,46 @@ Vue.createApp({
 				this.openSetting = false;
 				this.startUIHideTimer();
 				console.log('Settings dialog closed');
+			}
+		},
+
+		loadSettings: function () {
+			const saved = localStorage.getItem('pitch-detector-settings');
+			if (saved) {
+				try {
+					const settings = JSON.parse(saved);
+					Object.assign(this, settings);
+					console.log('⚙️ Settings loaded from localStorage');
+				} catch (e) {
+					console.error('❌ Failed to load settings from localStorage:', e);
+				}
+			}
+		},
+
+		saveSettings: function () {
+			const settings = {
+				freqOfA4: this.freqOfA4,
+				startNote: this.startNote,
+				endNote: this.endNote,
+				scale: this.scale,
+				showScope: this.showScope,
+				selectedName: this.selectedName,
+				pitchAlgorithm: this.pitchAlgorithm,
+				agcEnabled: this.agcEnabled,
+				agcTargetLevel: this.agcTargetLevel,
+				agcAttackTime: this.agcAttackTime,
+				agcReleaseTime: this.agcReleaseTime
+			};
+			localStorage.setItem('pitch-detector-settings', JSON.stringify(settings));
+			console.log('⚙️ Settings saved to localStorage');
+		},
+
+		clearSettings: function () {
+			if (confirm(t('confirm_clear_settings'))) {
+				localStorage.removeItem('pitch-detector-settings');
+				localStorage.removeItem('pitch-detector-language');
+				console.log('⚙️ Settings cleared from localStorage');
+				location.reload();
 			}
 		}
 	}

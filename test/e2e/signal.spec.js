@@ -1,9 +1,13 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Pitch Detection Signal Injection', () => {
-	test('should detect 440Hz as A4', async ({ page }) => {
+	test.beforeEach(async ({ page }) => {
 		await page.goto('/');
+		await page.evaluate(() => localStorage.clear());
+		await page.reload();
+	});
 
+	test('should detect 440Hz as A4', async ({ page }) => {
 		// Inject oscillator as audio source
 		await page.evaluate(() => {
 			window.__PITCH_DETECTOR_INJECT_SOURCE__ = async (audioContext) => {
