@@ -116,6 +116,8 @@ class AGCAudioWorklet {
 	}
 }
 
+const PITCH_DETECTION_SAMPLE_RATE = 24000;
+
 Vue.createApp({
 	data() {
 		return {
@@ -365,6 +367,7 @@ Vue.createApp({
 
 		initCanvas: function () {
 			// this.scopeCanvas = this.$refs.scopeCanvas;
+			if (!this.$refs.main) return;
 
 			const canvas = this.$refs.main;
 			canvas.style.width = null;
@@ -436,9 +439,10 @@ Vue.createApp({
 
 			console.log('Recording started');
 			this.status = t("recording");
+
+			// latencyHint: 'interactive' is important for responsiveness
 			this.audioContext = new AudioContext({
 				latencyHint: 'interactive',
-				sampleRate: 44100,
 			});
 
 			let source;
@@ -450,7 +454,7 @@ Vue.createApp({
 				source = this.audioContext.createMediaStreamSource(stream);
 			}
 
-			// Create and initialize AGC AudioWorklet
+			// 1. Initialize AGC AudioWorklet
 			this.agc = new AGCAudioWorklet(
 				this.audioContext,
 				this.agcTargetLevel,
@@ -458,116 +462,51 @@ Vue.createApp({
 				this.agcReleaseTime
 			);
 
-			const analyser = this.audioContext.createAnalyser();
-
+			// 2. Initialize StreamProcessor (10kHz Resampling & Contiguous Chunks)
 			try {
 				await this.agc.init();
+				await this.audioContext.audioWorklet.addModule('./stream-processor.js');
 
-				// Always connect audio graph: source -> AGC AudioWorklet -> analyser
-				source.connect(this.agc.getNode());
-				this.agc.getNode().connect(analyser);
-
-				// Set initial enabled state
-				const enabledParam = this.agc.getNode().parameters.get('enabled');
-				enabledParam.value = this.agcEnabled ? 1 : 0;
-
-				console.log('🎚️ AGC AudioWorklet connected in audio graph');
-			} catch (error) {
-				console.error('❌ AGC AudioWorklet initialization failed:', error);
-				// Fallback to direct connection
-				source.connect(analyser);
-				console.log('⚠️ Fallback: direct audio connection without AGC');
-			}
-
-			if (0) {
-				const osc = this.audioContext.createOscillator();
-				osc.type = 'sine';
-				osc.frequency.value = this.noteToHz(60);
-				osc.start();
-				osc.connect(analyser);
-			}
-
-
-			analyser.fftSize = 4096;
-			analyser.smoothingTimeConstant = 0.1;
-
-
-			const PART = 4;
-			const PART_LENGTH = analyser.fftSize / PART;
-			const sampleRate = this.audioContext.sampleRate;
-
-			// Initialize detector with current algorithm
-			this.initDetector();
-
-			const scopeCtx = this.$refs.scope.getContext("2d");
-			const scopeWidth = this.$refs.scope.width;
-			const scopeHeight = this.$refs.scope.height;
-			console.log({ scopeWidth, scopeHeight });
-
-			const audioData = new Float32Array(analyser.fftSize);
-
-			// Performance monitoring
-			let frameCount = 0;
-			let totalPitchTime = 0;
-
-			const draw = () => {
-				// Stop animation loop if audio context is closed
-				if (!this.audioContext) {
-					return;
-				}
-
-				analyser.getFloatTimeDomainData(audioData);
-
-				// Note: AGC processing is now handled by AudioWorkletNode in real-time
-
-				let detector = this.detector;
-				for (let p = 0; p < PART; p++) {
-					const start = PART_LENGTH * p;
-
-					// Measure pitch detection performance
-					const pitchStart = performance.now();
-					const [freq, clarity] = detector.findPitch(audioData.subarray(start, start + PART_LENGTH), sampleRate);
-					const pitchTime = performance.now() - pitchStart;
-					totalPitchTime += pitchTime;
-					frameCount++;
-
-					// Log performance every 100 frames
-					if (frameCount % 100 === 0) {
-						console.log(`📊 ${this.detector.constructor.name} avg detection time: ${(totalPitchTime / frameCount).toFixed(3)}ms/frame`);
-						frameCount = 0;
-						totalPitchTime = 0;
+				const streamNode = new AudioWorkletNode(this.audioContext, 'stream-processor', {
+					processorOptions: {
+						targetSampleRate: PITCH_DETECTION_SAMPLE_RATE
 					}
+				});
+				const analyser = this.audioContext.createAnalyser();
 
-					const note = this.hzToNote(freq);
-					// console.log({clarity, freq, note});
-					const y = this.mainHeight / this.noteLength * (this.noteLength - (note - this.startNote));
+				// Audio Graph: Source -> AGC -> StreamProcessor -> Analyser (for scope)
+				source.connect(this.agc.getNode());
+				this.agc.getNode().connect(streamNode);
+				streamNode.connect(analyser);
 
-					// draw dot
-					this.graphCtx.drawImage(
-						this.$refs.graph,
-						// source
-						1, 0, this.$refs.graph.width - 1, this.$refs.graph.height,
-						// dest
-						0, 0, this.$refs.graph.width - 1, this.$refs.graph.height
-					);
-					this.graphCtx.fillStyle = "#000000";
-					this.graphCtx.fillRect(this.mainWidth - 4, 0, 4, this.mainHeight);
-					this.graphCtx.fillStyle = `rgba(255, 0, 0, ${clarity})`;
-					this.graphCtx.fillRect(this.mainWidth - 4, y - 4, 8, 8);
+				// Set initial AGC enabled state
+				const enabledParam = this.agc.getNode().parameters.get('enabled');
+				if (enabledParam) enabledParam.value = this.agcEnabled ? 1 : 0;
 
+				console.log('🎚️ Audio graph connected: source -> AGC -> StreamProcessor -> Analyser');
 
-					// draw info
-					const fit = this.noteToHz(Math.round(note));
-					this.targetFreq = fit;
-					this.actualFreq = freq;
-					this.clarity = clarity;
-					this.note = note;
-					this.freqError = this.differenceInCent(fit, freq);
+				// 3. Initialize detector (ALWAYS 10kHz at this point)
+				this.initDetector();
 
-					this.up = this.freqError < -5;
-					this.down = this.freqError > 5;
+				// Listen for audio chunks from StreamProcessor
+				streamNode.port.onmessage = (event) => {
+					if (event.data.type === 'audioChunk') {
+						this.handleAudioChunk(event.data.buffer, event.data.sampleRate);
+					}
+				};
 
-					// draw scope
+				// Setup scope drawing
+				analyser.fftSize = 4096;
+				const scopeCtx = this.$refs.scope.getContext("2d");
+				const scopeWidth = this.$refs.scope.width;
+				const scopeHeight = this.$refs.scope.height;
+				const audioData = new Float32Array(analyser.fftSize);
+
+				const draw = () => {
+					if (!this.audioContext) return;
+					analyser.getFloatTimeDomainData(audioData);
+
+					// Draw scope
 					scopeCtx.fillStyle = "#000000";
 					scopeCtx.fillRect(0, 0, scopeWidth, scopeHeight);
 					scopeCtx.strokeStyle = "#fff";
@@ -580,15 +519,85 @@ Vue.createApp({
 						);
 					}
 					scopeCtx.stroke();
-				}
-
-
+					requestAnimationFrame(draw);
+				};
 				requestAnimationFrame(draw);
-			};
-			requestAnimationFrame(draw);
 
-			// Ensure UI hide timer starts after recording begins
+			} catch (error) {
+				console.error('❌ AudioWorklet initialization failed:', error);
+				this.status = "Error: " + error.message;
+				this.stop();
+				return;
+			}
+
 			this.startUIHideTimer();
+		},
+
+		/**
+		 * Handle contiguous audio chunks from StreamProcessor
+		 * Runs pitch detection at a fixed 10kHz rate.
+		 */
+		handleAudioChunk: function (buffer, sampleRate) {
+			if (!this.detector || !this.audioRingBuffer) return;
+
+			// 1. Shift existing data to make room for new chunk
+			// (Optimized: native copyWithin is fast)
+			const overlap = this.audioRingBuffer.length - buffer.length;
+			this.audioRingBuffer.copyWithin(0, buffer.length);
+
+			// 2. Append new chunk at the end
+			this.audioRingBuffer.set(buffer, overlap);
+
+			// First fill check
+			if (!this.isBufferFull) {
+				this.audioRingBufferPtr += buffer.length;
+				if (this.audioRingBufferPtr >= this.audioRingBuffer.length) {
+					this.isBufferFull = true;
+				} else {
+					return; // Wait until buffer is full
+				}
+			}
+
+			// 3. Detect pitch on the full sliding window
+			const pitchStart = performance.now();
+			const [freq, clarity] = this.detector.findPitch(this.audioRingBuffer, sampleRate);
+			const pitchTime = performance.now() - pitchStart;
+
+			// Performance monitoring
+			if (!this._pCount) this._pCount = 0;
+			if (!this._pTime) this._pTime = 0;
+			this._pTime += pitchTime;
+			this._pCount++;
+			if (this._pCount % 60 === 0) {
+				// Log every ~1 sec (60 frames)
+				console.log(`📊 ${this.detector.constructor.name} avg: ${(this._pTime / this._pCount).toFixed(3)}ms/frame (${(sampleRate / 1000).toFixed(1)}kHz)`);
+				this._pCount = 0;
+				this._pTime = 0;
+			}
+
+			// Update state for UI
+			this.actualFreq = freq;
+			this.clarity = clarity;
+			const note = this.hzToNote(freq);
+			this.note = note;
+
+			const fit = this.noteToHz(Math.round(note));
+			this.targetFreq = fit;
+			this.freqError = this.differenceInCent(fit, freq);
+			this.up = this.freqError < -5;
+			this.down = this.freqError > 5;
+
+			// Update history graph
+			const y = this.mainHeight / this.noteLength * (this.noteLength - (note - this.startNote));
+			this.graphCtx.drawImage(
+				this.$refs.graph,
+				1, 0, this.$refs.graph.width - 1, this.$refs.graph.height,
+				0, 0, this.$refs.graph.width - 1, this.$refs.graph.height
+			);
+			this.graphCtx.fillStyle = "#000000";
+			this.graphCtx.fillRect(this.mainWidth - 4, 0, 4, this.mainHeight);
+			this.graphCtx.fillStyle = `rgba(255, 0, 0, ${clarity})`;
+			this.graphCtx.fillRect(this.mainWidth - 4, y - 4, 8, 8);
 		},
 
 		stop: async function () {
@@ -626,13 +635,9 @@ Vue.createApp({
 
 		// Pitch detector initialization
 		initDetector: function () {
-			if (!this.audioContext) {
-				console.log('🔄 AudioContext not available, detector will be initialized on start');
-				return;
-			}
-
-			const PART_LENGTH = 4096 / 4; // Same as in start() method
-			const sampleRate = this.audioContext.sampleRate;
+			const sampleRate = PITCH_DETECTION_SAMPLE_RATE; // Fixed at 24kHz from StreamProcessor
+			const PART_LENGTH = 2048;  // Detection window size
+			const maxFreq = 4200;      // Covers piano C8 and more
 
 			// Clean up existing detector if any
 			if (this.detector) {
@@ -644,7 +649,7 @@ Vue.createApp({
 				this.detector = new YINDetector(sampleRate, PART_LENGTH, 0.2);
 				console.log('🎵 Using YIN pitch detection algorithm');
 			} else if (this.pitchAlgorithm === 'pyin') {
-				this.detector = new PYINDetector(sampleRate, PART_LENGTH);
+				this.detector = new PYINDetector(sampleRate, PART_LENGTH, 80, maxFreq);
 				console.log('🎵 Using PYIN pitch detection algorithm');
 			} else if (this.pitchAlgorithm === 'mpm') {
 				this.detector = new MPMDetector(sampleRate, PART_LENGTH, 0.93);
@@ -655,6 +660,13 @@ Vue.createApp({
 			}
 
 			console.log('🔄 Detector initialized:', this.detector.constructor.name);
+
+			// Initialize Ring Buffer for sliding window detection
+			// We need at least PART_LENGTH samples. 
+			// 2048 is safe for 1024 window with overlap.
+			this.audioRingBuffer = new Float32Array(PART_LENGTH);
+			this.audioRingBufferPtr = 0;
+			this.isBufferFull = false;
 		},
 
 		// UI visibility control methods
