@@ -416,8 +416,14 @@ Vue.createApp({
 				sampleRate: 44100,
 			});
 
-			const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-			const source = this.audioContext.createMediaStreamSource(stream);
+			let source;
+			if (window.__PITCH_DETECTOR_INJECT_SOURCE__) {
+				console.log('💉 Injecting test audio source');
+				source = await window.__PITCH_DETECTOR_INJECT_SOURCE__(this.audioContext);
+			} else {
+				const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+				source = this.audioContext.createMediaStreamSource(stream);
+			}
 
 			// Create and initialize AGC AudioWorklet
 			this.agc = new AGCAudioWorklet(
@@ -569,6 +575,15 @@ Vue.createApp({
 				this.detector = null;
 				this.status = "Tap to start";
 				console.log('🛑 Audio context stopped');
+
+				// Reset UI states
+				this.clarity = 0;
+				this.note = 0;
+				this.up = false;
+				this.down = false;
+				this.freqError = 0;
+				this.actualFreq = 0;
+				this.targetFreq = 0;
 
 				// Show UI and clear timer when recording stops
 				this.showUI();

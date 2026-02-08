@@ -1,2 +1,5 @@
 .claude
 node_modules/
+playwright-report/
+playwright-video/
+test-results/

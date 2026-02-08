@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.js",
-    "serve": "python -m http.server 8000",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "serve": "serve -n",
     "generate-icons": "node scripts/generate-icons.js",
     "start": "npm run serve"
   },
@@ -24,6 +26,8 @@
     "node": ">=14.0.0"
   },
   "devDependencies": {
-    "@resvg/resvg-js": "^2.6.2"
+    "@playwright/test": "^1.58.2",
+    "@resvg/resvg-js": "^2.6.2",
+    "serve": "^14.2.5"
   }
 }
