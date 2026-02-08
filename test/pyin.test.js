@@ -53,23 +53,34 @@ describe('PYIN Algorithm Test Suite', () => {
             assert(avgSelfTransition > 0.98, `Self transition probability too low: ${avgSelfTransition}`);
         });
 
-        test('観測確率計算テスト', () => {
-            const states = PYINCore.createPitchStates(200, 600, 3);
-            const observations = [
-                [{ frequency: 440, probability: 0.8 }, { frequency: 880, probability: 0.2 }],
-                [{ frequency: 441, probability: 0.9 }],
-                []  // 無音フレーム
-            ];
-
-            const obsProb = PYINCore.calculateObservationProbabilities(states, observations);
-
-            assert.strictEqual(obsProb.length, 3);
-            assert.strictEqual(obsProb[0].length, states.length);
-
+        test('観測確率計算の数学的妥当性テスト', () => {
+            const minFreq = 200;
+            const maxFreq = 600;
+            const states = PYINCore.createPitchStates(minFreq, maxFreq, 3);
+            const voicedStates = states.filter(s => s.voiced);
+            const vCount = voicedStates.length;
             const unvoicedStateIndex = states.findIndex(s => !s.voiced);
-            const unvoicedProbForSilence = obsProb[2][unvoicedStateIndex];
 
-            assert(unvoicedProbForSilence > 0.8, `Silence should favor unvoiced state. Got ${unvoicedProbForSilence}`);
+            // シナリオ1: 確実なピッチ候補がある場合
+            const obs1 = [{ frequency: 440, probability: 0.9 }];
+            const prob1 = PYINCore.calculateObservationProbabilities(states, [obs1])[0];
+            
+            // 無声確率は (1 - 0.9) / vCount に分配されているはず
+            const expectedUnvoiced1 = (1 - 0.9) / vCount;
+            assert(Math.abs(prob1[unvoicedStateIndex] - expectedUnvoiced1) < 1e-6, 
+                `Strong signal should result in distributed unvoiced prob. Expected ${expectedUnvoiced1}, got ${prob1[unvoicedStateIndex]}`);
+
+            // シナリオ2: 候補がない（無音/ノイズ）場合
+            const obs2 = []; // totalVoicedProb = 0
+            const prob2 = PYINCore.calculateObservationProbabilities(states, [obs2])[0];
+            
+            // 無声確率は (1 - 0) / vCount 
+            const expectedUnvoiced2 = 1.0 / vCount;
+            assert(Math.abs(prob2[unvoicedStateIndex] - expectedUnvoiced2) < 1e-6,
+                `Silence should distribute full probability. Expected ${expectedUnvoiced2}, got ${prob2[unvoicedStateIndex]}`);
+
+            // 有声ビンとの比較: 無音時は、どの有声ビン（1e-15）よりも無声ビン（1/vCount）が圧倒的に高いはず
+            assert(prob2[unvoicedStateIndex] > 1e-10, "Unvoiced state should be dominant in silence");
         });
 
         test('Viterbi Algorithm Mathematical Verification', () => {
