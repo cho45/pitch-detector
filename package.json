@@ -5,7 +5,7 @@
   "main": "script.js",
   "type": "module",
   "scripts": {
-    "test": "node test/yin.test.js && node test/yin-comprehensive.test.js && node test/pyin.test.js",
+    "test": "node --test test/*.test.js",
     "serve": "python -m http.server 8000",
     "start": "npm run serve"
   },
