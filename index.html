@@ -5,7 +5,7 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-		<title>Pitch Detecter</title>
+		<title>{{ t('title') }}</title>
 		<meta name="theme-color" content="#0f0f23">
 		<link rel="manifest" href="manifest.json">
 		<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -267,20 +267,20 @@
 			<div id="status" :style="{ opacity: uiVisible ? 1 : 0.0 }">{{status}}</div>
 			<div class="control-buttons" :style="{ opacity: uiVisible ? 1 : 0.0 }">
 				<button v-if="audioContext" type="button" @click="stop" class="stop-btn">
-					Stop Recording
+					{{ t('stop_recording') }}
 				</button>
 				<button v-else @click="start" type="button" class="start-btn">
-					Start Recording
+					{{ t('start_recording') }}
 				</button>
 			</div>
 			<div id="options" :class="{ open: openSetting }" :style="{ opacity: uiVisible ? 1 : 0.0 }">
 				<div style="text-align: right">
 					<div @click="openSetting = !openSetting" class="setting-toggle">
 						<span v-if="!openSetting">
-							⚙️ Settings
+							{{ t('settings_icon') }}
 						</span>
 						<span v-else>
-							✕ Close
+							{{ t('close_icon') }}
 						</span>
 					</div>
 				</div>
@@ -288,12 +288,12 @@
 					<p>
 						<input type="checkbox" v-model="showScope" id="options-scope">
 						<label for="options-scope">
-							Scope
+							{{ t('scope') }}
 						</label>
 					</p>
 					<p>
 						<label for="options-name">
-							Name
+							{{ t('name') }}
 						</label>
 						<select v-model="selectedName" id="options-name">
 							<option :value="names.name" v-for="names in noteName">{{ names.name }}</option>
@@ -301,10 +301,10 @@
 					</p>
 					<p>
 						<label for="options-scale">
-							Scale
+							{{ t('scale') }}
 						</label>
 						<select v-model="scale" id="options-scale">
-							<optgroup label="major">
+							<optgroup :label="t('major')">
 								<option value="0,major">C</option>
 								<option value="1,major">D&#x266D;/C&#x266F;</option>
 								<option value="2,major">D</option>
@@ -318,7 +318,7 @@
 								<option value="10,major">B&#x266D;/A&#x266F;</option>
 								<option value="11,major">B</option>
 							</optgroup>
-							<optgroup label="minor (natural)">
+							<optgroup :label="t('minor')">
 								<option value="0,minor">Cm</option>
 								<option value="1,minor">D&#x266D;/C&#x266F;m</option>
 								<option value="2,minor">Dm</option>
@@ -336,13 +336,13 @@
 					</p>
 					<p>
 						<label for="options-tune">
-							Freq. of A4
+							{{ t('freq_of_a4') }}
 						</label>
 						<input type="number" v-model="freqOfA4" id="options-tune">
 					</p>
 					<p>
 						<label for="options-algorithm">
-							Algorithm
+							{{ t('algorithm') }}
 						</label>
 						<select v-model="pitchAlgorithm" id="options-algorithm">
 							<option value="pitchy">Pitchy (Autocorr + NSDF)</option>
@@ -354,32 +354,41 @@
 					<p>
 						<input type="checkbox" v-model="agcEnabled" id="options-agc-enabled">
 						<label for="options-agc-enabled">
-							AGC (Automatic Gain Control)
+							{{ t('agc_enabled') }}
 						</label>
 					</p>
 					<div v-if="agcEnabled">
 						<p>
 							<label for="options-agc-target">
-								AGC Target Level
+								{{ t('agc_target_level') }}
 							</label>
 							<input type="range" v-model.number="agcTargetLevel" min="0.1" max="0.8" step="0.05" id="options-agc-target">
 							<span>{{ agcTargetLevel.toFixed(2) }}</span>
 						</p>
 						<p>
 							<label for="options-agc-attack">
-								AGC Attack Time (ms)
+								{{ t('agc_attack_time') }}
 							</label>
 							<input type="range" v-model.number="agcAttackTime" min="0.001" max="0.1" step="0.001" id="options-agc-attack">
 							<span>{{ (agcAttackTime * 1000).toFixed(1) }}ms</span>
 						</p>
 						<p>
 							<label for="options-agc-release">
-								AGC Release Time (ms)
+								{{ t('agc_release_time') }}
 							</label>
 							<input type="range" v-model.number="agcReleaseTime" min="0.01" max="1.0" step="0.01" id="options-agc-release">
 							<span>{{ (agcReleaseTime * 1000).toFixed(0) }}ms</span>
 						</p>
 					</div>
+					<p>
+						<label for="options-language">
+							{{ t('language') }}
+						</label>
+						<select v-model="currentLanguage" id="options-language">
+							<option value="en">English</option>
+							<option value="ja">日本語</option>
+						</select>
+					</p>
 				</div>
 			</div>
 		</div>

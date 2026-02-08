@@ -3,6 +3,7 @@ import { PitchDetector } from "./lib/pitchy.js";
 import { YINDetector, createYINDetector } from "./lib/yin.js";
 import { PYINDetector, createPYINDetector } from "./lib/pyin.js";
 import { MPMDetector, createMPMDetector } from "./lib/mpm.js";
+import { i18n, t } from "./lib/i18n.js";
 
 /**
  * AGC AudioWorklet Node Wrapper
@@ -118,7 +119,8 @@ class AGCAudioWorklet {
 Vue.createApp({
 	data() {
 		return {
-			status: "Tap to start",
+			status: t("tap_to_start"),
+			currentLanguage: i18n.language,
 
 			// https://en.wikipedia.org/wiki/Scientific_pitch_notation
 			// center C is note number 60
@@ -266,7 +268,11 @@ Vue.createApp({
 				}
 			}
 		},
-
+		currentLanguage() {
+			i18n.setLanguage(this.currentLanguage);
+			this.status = this.audioContext ? t("recording") : t("tap_to_start");
+			this.initCanvas();
+		},
 	},
 
 	mounted() {
@@ -321,6 +327,10 @@ Vue.createApp({
 				const name = names.values[note % 12];
 				return name + octave;
 			}
+		},
+
+		t: function (key) {
+			return t(key);
 		},
 
 		isScaleTone: function (note) {
@@ -410,7 +420,7 @@ Vue.createApp({
 			if (this.audioContext) return;
 
 			console.log('Recording started');
-			this.status = "Recording";
+			this.status = t("recording");
 			this.audioContext = new AudioContext({
 				latencyHint: 'interactive',
 				sampleRate: 44100,
@@ -573,7 +583,7 @@ Vue.createApp({
 				this.audioContext = null;
 				this.agc = null;
 				this.detector = null;
-				this.status = "Tap to start";
+				this.status = t("tap_to_start");
 				console.log('🛑 Audio context stopped');
 
 				// Reset UI states
