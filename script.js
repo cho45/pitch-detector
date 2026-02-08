@@ -152,6 +152,11 @@ Vue.createApp({
 
 			openSetting: false,
 
+			// Audio state
+			audioContext: null,
+			agc: null,
+			detector: null,
+
 			// UI visibility control
 			uiVisible: true,
 			uiHideTimer: null,
