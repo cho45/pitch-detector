@@ -123,6 +123,32 @@ describe('MPM Algorithm Test Suite', () => {
             const refinedSym = MPMCore.parabolicInterpolation(symmetric, 1);
             assertAlmostEqual(refinedSym, 1, 0.01);
         });
+
+        test('NSDF calculation for a simple sequence', () => {
+            // Sequence: [1, 0, -1, 0]
+            // N = 4
+            // tau = 0: r(0) = 1*1 + 0*0 + (-1)*(-1) + 0*0 = 2
+            //          m(0) = (1*1+1*1) + (0*0+0*0) + (1*1+1*1) + (0*0+0*0) = 4
+            //          nsdf(0) = 2 * 2 / 4 = 1.0
+            // tau = 1: r(1) = 1*0 + 0*(-1) + (-1)*0 = 0
+            //          m(1) = (1*1+0*0) + (0*0+1*1) + (1*1+0*0) = 3
+            //          nsdf(1) = 2 * 0 / 3 = 0.0
+            // tau = 2: r(2) = 1*(-1) + 0*0 = -1
+            //          m(2) = (1*1+1*1) + (0*0+0*0) = 2
+            //          nsdf(2) = 2 * (-1) / 2 = -1.0
+            const audioBuffer = new Float32Array([1, 0, -1, 0]);
+            const nsdfBuffer = new Float32Array(4);
+            MPMCore.calculateNSDF(audioBuffer, nsdfBuffer);
+            assertAlmostEqual(nsdfBuffer[0], 1.0);
+            assertAlmostEqual(nsdfBuffer[1], 0.0);
+            assertAlmostEqual(nsdfBuffer[2], -1.0);
+        });
+
+        test('parabolicInterpolation refine peak of y = -(x-0.2)^2 + 1', () => {
+            const array = new Float32Array([-0.44, 0.96, 0.36]); // x=-1, 0, 1. Peak at x=0.2
+            const refined = MPMCore.parabolicInterpolation(array, 1);
+            assertAlmostEqual(refined, 1.2); // 1 + 0.2
+        });
     });
 
     describe('MPMDetector class', () => {
