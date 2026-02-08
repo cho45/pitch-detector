@@ -645,6 +645,8 @@ Vue.createApp({
 		// UI visibility control methods
 		startUIHideTimer: function () {
 			this.clearUIHideTimer();
+			if (this.openSetting) return; // Settings dialog is open, don't start timer
+
 			this.uiHideTimer = setTimeout(() => {
 				this.hideUI();
 			}, 3000); // Hide after 3 seconds
@@ -658,7 +660,7 @@ Vue.createApp({
 		},
 
 		hideUI: function () {
-			if (this.audioContext) {
+			if (this.audioContext && !this.openSetting) {
 				this.uiVisible = false;
 				console.log('UI hidden');
 			}
@@ -674,6 +676,27 @@ Vue.createApp({
 		onUIInteraction: function () {
 			if (this.audioContext) {
 				this.showUI();
+			}
+		},
+
+		openSettings: function () {
+			const dialog = this.$refs.settingsDialog;
+			if (dialog) {
+				this.openSetting = true;
+				dialog.showModal();
+				this.clearUIHideTimer();
+				this.uiVisible = true;
+				console.log('Settings dialog opened');
+			}
+		},
+
+		closeSettings: function () {
+			const dialog = this.$refs.settingsDialog;
+			if (dialog) {
+				dialog.close();
+				this.openSetting = false;
+				this.startUIHideTimer();
+				console.log('Settings dialog closed');
 			}
 		}
 	}

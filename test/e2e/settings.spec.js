@@ -4,27 +4,28 @@ test.describe('Settings UI', () => {
 	test.beforeEach(async ({ page }) => {
 		await page.goto('/');
 	});
-
 	test('should open and close settings menu', async ({ page }) => {
-		const settingsBtn = page.locator('.setting-toggle');
-		const optionsDiv = page.locator('#options');
+		const settingsBtn = page.locator('.settings-btn');
+		const dialog = page.locator('#settings-dialog');
+		const closeBtn = page.locator('.close-dialog-btn');
 
 		// Initially closed
-		await expect(page.locator('label[for="options-scope"]')).not.toBeVisible();
+		await expect(dialog).not.toBeVisible();
 
 		// Open
 		await settingsBtn.click();
-		await expect(optionsDiv).toHaveClass(/open/);
+		await expect(dialog).toBeVisible();
+		await expect(dialog).toHaveAttribute('open', '');
 		await expect(page.locator('label[for="options-scope"]')).toBeVisible();
 
-		// Close
-		await settingsBtn.click();
-		await expect(optionsDiv).not.toHaveClass(/open/);
-		await expect(page.locator('label[for="options-scope"]')).not.toBeVisible();
+		// Close via close button
+		await closeBtn.click();
+		await expect(dialog).not.toBeVisible();
+		await expect(dialog).not.toHaveAttribute('open', '');
 	});
 
 	test('should toggle scope and reflect in UI', async ({ page }) => {
-		await page.locator('.setting-toggle').click();
+		await page.locator('.settings-btn').click();
 		const scopeCheckbox = page.locator('#options-scope');
 		const scopeContainer = page.locator('div[style*="background: #fff"], div[style*="background: rgb(255, 255, 255)"]');
 
@@ -37,12 +38,15 @@ test.describe('Settings UI', () => {
 	});
 
 	test('should change algorithm', async ({ page }) => {
-		await page.locator('.setting-toggle').click();
+		await page.locator('.settings-btn').click();
 		const algoSelect = page.locator('#options-algorithm');
 
 		// Change to MPM
 		await algoSelect.selectOption('mpm');
 		await expect(algoSelect).toHaveValue('mpm');
+
+		// Close settings to interact with the main UI
+		await page.locator('.close-dialog-btn').click();
 
 		// Start recording and check if it still works (using console log check)
 		const consoleMessages = [];
@@ -64,7 +68,7 @@ test.describe('Settings UI', () => {
 	});
 
 	test('should toggle AGC and show/hide its settings', async ({ page }) => {
-		await page.locator('.setting-toggle').click();
+		await page.locator('.settings-btn').click();
 		const agcCheckbox = page.locator('#options-agc-enabled');
 		const agcSettings = page.locator('label[for="options-agc-target"]');
 
@@ -75,5 +79,8 @@ test.describe('Settings UI', () => {
 		// Toggle OFF
 		await agcCheckbox.uncheck();
 		await expect(agcSettings).not.toBeVisible();
+
+		// Clean up: close dialog
+		await page.locator('.close-dialog-btn').click();
 	});
 });

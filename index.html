@@ -5,7 +5,7 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-		<title>{{ t('title') }}</title>
+		<title>Pitch Detector</title>
 		<meta name="theme-color" content="#0f0f23">
 		<link rel="manifest" href="manifest.json">
 		<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -60,72 +60,120 @@
 				transition: opacity 0.5s ease;
 			}
 
-			#options {
-				position: absolute;
-				bottom: 10px;
-				right: 10px;
-				padding: 15px 0;
-				font-size: 14px;
-				border-radius: 15px;
-				box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-				backdrop-filter: blur(10px);
-				min-width: 200px;
-				transition: opacity 0.5s ease;
+			#settings-dialog {
+				background: rgba(255, 255, 255, 0.85);
+				backdrop-filter: blur(15px);
+				-webkit-backdrop-filter: blur(15px);
+				border: 1px solid rgba(255, 255, 255, 0.3);
+				border-radius: 20px;
+				padding: 25px;
+				box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+				color: #333;
+				max-width: 90vw;
+				width: 400px;
 			}
 
-			#options.open {
-				background: rgba(255, 255, 255, 0.95);
-				padding: 15px;
+			#settings-dialog::backdrop {
+				background: rgba(0, 0, 0, 0.5);
+				backdrop-filter: blur(3px);
 			}
 
-			#options p {
+			#settings-dialog h2 {
+				margin-top: 0;
+				margin-bottom: 20px;
+				font-size: 20px;
+				font-weight: 600;
+				color: #1a1a2e;
+				border-bottom: 2px solid #edeff2;
+				padding-bottom: 10px;
+			}
+
+			#settings-dialog p {
 				display: flex;
-				margin: 12px 0;
+				margin: 15px 0;
 				padding: 0;
 				align-items: center;
+				justify-content: space-between;
 			}
 
-			#options p > label {
-				order: 0;
-				width: 7em;
-				padding: 0 1em 0 0;
+			#settings-dialog label {
 				font-weight: 500;
-				color: #444;
+				color: #4a5568;
+				font-size: 14px;
 			}
 
-			#options p > input[type="checkbox"] {
-				order: 1;
-				flex: none;
-				width: auto;
-				transform: scale(1.1);
-			}
-
-			#options select, #options input[type="number"] {
-				padding: 6px 10px;
-				border: 1px solid #ddd;
-				border-radius: 8px;
-				background: white;
-				font-size: 13px;
-			}
-
-			#options input[type="range"] {
-				flex: 1;
-				margin-right: 10px;
-			}
-
-			.setting-toggle {
-				cursor: pointer;
+			#settings-dialog select, #settings-dialog input[type="number"] {
 				padding: 8px 12px;
+				border: 1px solid #cbd5e0;
+				border-radius: 10px;
+				background: white;
+				font-size: 14px;
+				color: #2d3748;
+				outline: none;
+				transition: border-color 0.2s;
+			}
+
+			#settings-dialog select:focus, #settings-dialog input[type="number"]:focus {
+				border-color: #4ecdc4;
+			}
+
+			#settings-dialog input[type="range"] {
+				flex: 1;
+				margin: 0 10px;
+			}
+
+			#settings-dialog input[type="checkbox"] {
+				width: 18px;
+				height: 18px;
+				cursor: pointer;
+			}
+
+			#settings-dialog .dialog-footer {
+				margin-top: 25px;
+				text-align: right;
+			}
+
+			.close-dialog-btn {
 				background: #4a5568;
 				color: white;
-				border-radius: 8px;
-				text-align: center;
-				font-weight: 500;
-				transition: background-color 0.2s;
+				border: none;
+				padding: 8px 20px;
+				border-radius: 15px;
+				cursor: pointer;
+				font-weight: 600;
+				transition: background 0.2s;
 			}
 
-			.setting-toggle:hover {
+			.close-dialog-btn:hover {
 				background: #2d3748;
+			}
+
+			.settings-btn {
+				position: absolute;
+				bottom: 20px;
+				right: 20px;
+				width: 44px;
+				height: 44px;
+				border-radius: 50%;
+				background: rgba(255, 255, 255, 0.2);
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				border: 1px solid rgba(255, 255, 255, 0.3);
+				color: white;
+				font-size: 24px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				cursor: pointer;
+				transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+				box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+				z-index: 100;
+			}
+
+			.settings-btn:hover {
+				background: rgba(255, 255, 255, 0.3);
+				transform: rotate(45deg);
+				box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 			}
 
 			#tuner {
@@ -202,6 +250,7 @@
 				transform: translateX(-50%);
 				text-align: center;
 				transition: opacity 0.5s ease;
+				z-index: 50;
 			}
 
 			.control-buttons button {
@@ -273,23 +322,19 @@
 					{{ t('start_recording') }}
 				</button>
 			</div>
-			<div id="options" :class="{ open: openSetting }" :style="{ opacity: uiVisible ? 1 : 0.0 }">
-				<div style="text-align: right">
-					<div @click="openSetting = !openSetting" class="setting-toggle">
-						<span v-if="!openSetting">
-							{{ t('settings_icon') }}
-						</span>
-						<span v-else>
-							{{ t('close_icon') }}
-						</span>
-					</div>
-				</div>
-				<div v-if="openSetting">
+
+			<div class="settings-btn" @click="openSettings" :style="{ opacity: uiVisible ? 1 : 0.0 }" :title="t('settings_icon')">
+				⚙️
+			</div>
+
+			<dialog ref="settingsDialog" id="settings-dialog">
+				<h2>{{ t('settings_subtitle') || 'Settings' }}</h2>
+				<div>
 					<p>
-						<input type="checkbox" v-model="showScope" id="options-scope">
 						<label for="options-scope">
 							{{ t('scope') }}
 						</label>
+						<input type="checkbox" v-model="showScope" id="options-scope">
 					</p>
 					<p>
 						<label for="options-name">
@@ -352,10 +397,10 @@
 						</select>
 					</p>
 					<p>
-						<input type="checkbox" v-model="agcEnabled" id="options-agc-enabled">
 						<label for="options-agc-enabled">
 							{{ t('agc_enabled') }}
 						</label>
+						<input type="checkbox" v-model="agcEnabled" id="options-agc-enabled">
 					</p>
 					<div v-if="agcEnabled">
 						<p>
@@ -390,7 +435,10 @@
 						</select>
 					</p>
 				</div>
-			</div>
+				<div class="dialog-footer">
+					<button class="close-dialog-btn" @click="closeSettings">{{ t('close_icon') }}</button>
+				</div>
+			</dialog>
 		</div>
 	</body>
 </html>
