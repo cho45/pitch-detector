@@ -765,8 +765,36 @@ Vue.createApp({
 				console.log('⚙️ Settings cleared from localStorage');
 				location.reload();
 			}
+		},
+
+		clearCache: async function () {
+			if (confirm(t('confirm_clear_cache'))) {
+				if ('serviceWorker' in navigator) {
+					const registrations = await navigator.serviceWorker.getRegistrations();
+					for (const registration of registrations) {
+						await registration.unregister();
+					}
+				}
+				if ('caches' in window) {
+					const keys = await caches.keys();
+					await Promise.all(keys.map(key => caches.delete(key)));
+				}
+				alert(t('cache_cleared'));
+				location.reload();
+			}
 		}
 	}
 }).mount("#app");
+
+if ('serviceWorker' in navigator) {
+	window.addEventListener('load', () => {
+		navigator.serviceWorker.register('./sw.js')
+			.then((registration) => {
+				console.log('ServiceWorker registration successful with scope: ', registration.scope);
+			}, (err) => {
+				console.log('ServiceWorker registration failed: ', err);
+			});
+	});
+}
 
 
