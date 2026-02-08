@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pitch-detector-v2';
+const CACHE_NAME = 'pitch-detector-v3';
 const ASSETS = [
 	'./',
 	'./index.html',
@@ -40,20 +40,22 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
 	event.respondWith(
-		caches.match(event.request)
+		fetch(event.request)
 			.then((response) => {
-				return response || fetch(event.request).then((response) => {
-					// Cache successful GET requests
-					if (!response || response.status !== 200 || response.type !== 'basic' || event.request.method !== 'GET') {
-						return response;
-					}
-					const responseToCache = response.clone();
-					caches.open(CACHE_NAME)
-						.then((cache) => {
-							cache.put(event.request, responseToCache);
-						});
+				// Cache successful GET requests
+				if (!response || response.status !== 200 || response.type !== 'basic' || event.request.method !== 'GET') {
 					return response;
-				});
+				}
+				const responseToCache = response.clone();
+				caches.open(CACHE_NAME)
+					.then((cache) => {
+						cache.put(event.request, responseToCache);
+					});
+				return response;
+			})
+			.catch(() => {
+				// If network fails, try to serve from cache
+				return caches.match(event.request);
 			})
 	);
 });
