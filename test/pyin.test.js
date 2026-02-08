@@ -53,34 +53,31 @@ describe('PYIN Algorithm Test Suite', () => {
             assert(avgSelfTransition > 0.98, `Self transition probability too low: ${avgSelfTransition}`);
         });
 
-        test('観測確率計算の数学的妥当性テスト', () => {
+        test('観測確率計算の数学的妥当性と精度（対数領域）テスト', () => {
             const minFreq = 200;
             const maxFreq = 600;
             const states = PYINCore.createPitchStates(minFreq, maxFreq, 3);
-            const voicedStates = states.filter(s => s.voiced);
-            const vCount = voicedStates.length;
+            const vCount = states.filter(s => s.voiced).length;
             const unvoicedStateIndex = states.findIndex(s => !s.voiced);
 
             // シナリオ1: 確実なピッチ候補がある場合
             const obs1 = [{ frequency: 440, probability: 0.9 }];
-            const prob1 = PYINCore.calculateObservationProbabilities(states, [obs1])[0];
+            // 新しい対数領域メソッドを呼び出す（まだ実装されていないので失敗する）
+            const logProbs1 = new Float32Array(states.length);
+            PYINCore.fillObservationLogProbabilities(states, obs1, logProbs1);
             
-            // 無声確率は (1 - 0.9) / vCount に分配されているはず
-            const expectedUnvoiced1 = (1 - 0.9) / vCount;
-            assert(Math.abs(prob1[unvoicedStateIndex] - expectedUnvoiced1) < 1e-6, 
-                `Strong signal should result in distributed unvoiced prob. Expected ${expectedUnvoiced1}, got ${prob1[unvoicedStateIndex]}`);
+            // 無声の対数尤度は log((1 - 0.9) / vCount) であるはず
+            const expectedUnvoicedLog1 = Math.log((1 - 0.9) / vCount);
+            assert(Math.abs(logProbs1[unvoicedStateIndex] - expectedUnvoicedLog1) < 1e-6, 
+                `Precision check failed. Expected ${expectedUnvoicedLog1}, got ${logProbs1[unvoicedStateIndex]}`);
 
-            // シナリオ2: 候補がない（無音/ノイズ）場合
-            const obs2 = []; // totalVoicedProb = 0
-            const prob2 = PYINCore.calculateObservationProbabilities(states, [obs2])[0];
+            // シナリオ2: 候補がない場合
+            const obs2 = []; 
+            const logProbs2 = new Float32Array(states.length);
+            PYINCore.fillObservationLogProbabilities(states, obs2, logProbs2);
             
-            // 無声確率は (1 - 0) / vCount 
-            const expectedUnvoiced2 = 1.0 / vCount;
-            assert(Math.abs(prob2[unvoicedStateIndex] - expectedUnvoiced2) < 1e-6,
-                `Silence should distribute full probability. Expected ${expectedUnvoiced2}, got ${prob2[unvoicedStateIndex]}`);
-
-            // 有声ビンとの比較: 無音時は、どの有声ビン（1e-15）よりも無声ビン（1/vCount）が圧倒的に高いはず
-            assert(prob2[unvoicedStateIndex] > 1e-10, "Unvoiced state should be dominant in silence");
+            const expectedUnvoicedLog2 = Math.log(1.0 / vCount);
+            assert(Math.abs(logProbs2[unvoicedStateIndex] - expectedUnvoicedLog2) < 1e-6);
         });
 
         test('Viterbi Algorithm Mathematical Verification', () => {
@@ -189,6 +186,22 @@ describe('PYIN Algorithm Test Suite', () => {
             assert(error < 5, `Error too high: ${error}Hz`);
         });
 
+        test('PYIN確信度計算テスト（正弦波）', () => {
+            const detector = new PYINDetector(44100, 2048);
+            const signal = YINTestUtils.generateSineWave(440, 44100, 2048 / 44100);
+
+            // 安定するまで数フレーム回す
+            let confidence = 0;
+            for(let i=0; i<5; i++) {
+                [, confidence] = detector.findPitch(signal);
+            }
+
+            // 明確な正弦波であれば、有声である確率は非常に高いはず
+            // 現在の実装（1/sum）では確率分散により低くなるが、
+            // 理論的に正しい（全有声確率の和）なら 0.98 以上になるはず
+            assert(confidence > 0.98, `Confidence should be very high for sine wave. Got ${confidence}`);
+        });
+
         test('PYIN無声（ノイズ）入力テスト', () => {
             const detector = new PYINDetector(44100, 2048);
             const noisySignal = YINTestUtils.addNoise(new Float32Array(2048), 1.0);
@@ -291,6 +304,81 @@ describe('PYIN Algorithm Test Suite', () => {
             // This assertion might fail with current implementation (Online only)
             // which confirms we need to implement true Viterbi.
             assert(isCorrected, `Middle frame should be corrected to 440Hz by Viterbi. Got: ${freqs[1]}Hz. Sequence: ${freqs.join(', ')}`);
+        });
+
+        test('Offline detectPitch should have the same noise robustness as online findPitch', () => {
+            const sampleRate = 44100;
+            const frameSize = 2048;
+            const detector = new PYINDetector(sampleRate, frameSize);
+            
+            // 440Hzの正弦波にノイズを加え、有声確率が下がる信号を作成
+            const cleanSignal = YINTestUtils.generateSineWave(440, sampleRate, frameSize / sampleRate);
+            const noisySignal = YINTestUtils.addNoise(cleanSignal, 0.25);
+            
+            // 1. オンライン処理の結果
+            detector.reset();
+            const [onlineFreq, onlineConf] = detector.findPitch(noisySignal);
+            
+            // 2. オフライン処理の結果
+            const frames = [noisySignal];
+            const pitchTrack = detector.detectPitch(frames);
+            const offlineFreq = pitchTrack[0].frequency;
+
+            // 理論上、両者は同じロジックで尤度を計算すべきであり、
+            // オンラインで検出できているならオフラインでも検出できなければならない。
+            assert(onlineFreq > 0, "Online should detect the pitch under this noise level");
+            assert(offlineFreq > 0, `Offline should also detect the pitch. Got ${offlineFreq}Hz (Online got ${onlineFreq}Hz)`);
+        });
+
+        test('Transition model should penalize large pitch jumps (RED test)', () => {
+            const detector = new PYINDetector(44100, 2048, 80, 800);
+            
+            // シナリオ: 440Hz -> 445Hz (滑らかな変化) の間に、
+            // 600Hz (遠いノイズ) が1フレームだけ混入
+            const states = detector.states;
+            const nStates = states.length;
+            
+            // 状態インデックスを確実に取得する（誤差を考慮）
+            const findIdx = (f) => states.findIndex(s => s.voiced && Math.abs(1200 * Math.log2(s.frequency / f)) < 25);
+            
+            const state440Idx = findIdx(440);
+            const state445Idx = findIdx(445);
+            const state600Idx = findIdx(600);
+
+            assert(state440Idx !== -1, "440Hz state should exist");
+            assert(state445Idx !== -1, "445Hz state should exist");
+            assert(state600Idx !== -1, "600Hz state should exist");
+
+            // 3フレーム分の観測対数尤度行列
+            const obsLogs = new Float32Array(3 * nStates).fill(-50); // 基本は極低確率
+
+            // Frame 0: 440Hzが明確
+            obsLogs[0 * nStates + state440Idx] = 0;
+
+            // Frame 1: 445Hz (正解) と 600Hz (遠いノイズ) が競合
+            // 600Hz の方の尤度をわずかに高く設定する
+            obsLogs[1 * nStates + state445Idx] = -1.0; 
+            obsLogs[1 * nStates + state600Idx] = -0.5; // 600Hzの方が「観測」としては強い
+
+            // Frame 2: 450Hz付近が明確
+            const state450Idx = findIdx(450);
+            assert(state450Idx !== -1, "450Hz state should exist");
+            obsLogs[2 * nStates + state450Idx] = 0;
+
+            // Viterbi実行
+            const initial = new Float32Array(nStates).fill(Math.log(0.5 / (nStates-1)));
+            const unvoicedIdx = states.findIndex(s => !s.voiced);
+            initial[unvoicedIdx] = Math.log(0.5);
+
+            const path = PYINCore.viterbi(initial, detector.transitions, obsLogs, 3, nStates);
+            const freqAtFrame1 = states[path[1]].frequency;
+
+            console.log(`Path: ${states[path[0]].frequency}, ${states[path[1]].frequency}, ${states[path[2]].frequency}`);
+
+            // 現在の「一律な遷移確率」モデルでは、遷移コストが同じであるため、
+            // 観測尤度が高い 600Hz を選んでしまう。
+            // 理想的なモデルなら 440Hzから近い 445Hz を選ぶはず。
+            assert(Math.abs(freqAtFrame1 - 445) < 10, `Should prioritize 445Hz due to proximity. Got: ${freqAtFrame1}Hz`);
         });
     });
 

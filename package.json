@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.js",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
+    "test:e2e": "CI=1 playwright test",
+    "test:e2e:headed": "CI=1 playwright test --headed",
     "serve": "serve -n",
     "generate-icons": "node scripts/generate-icons.js",
     "start": "npm run serve"

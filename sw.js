@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pitch-detector-v1';
+const CACHE_NAME = 'pitch-detector-v2';
 const ASSETS = [
 	'./',
 	'./index.html',
@@ -6,10 +6,13 @@ const ASSETS = [
 	'./manifest.json',
 	'./lib/vue.global.js',
 	'./lib/pitchy.js',
+	'./lib/fft.js',
 	'./lib/yin.js',
 	'./lib/pyin.js',
+	'./lib/statistics.js',
 	'./lib/mpm.js',
 	'./lib/i18n.js',
+	'./lib/downsample.js',
 	'./agc-processor.js',
 	'./stream-processor.js',
 	'./icons/icon-192.png',

@@ -24,7 +24,7 @@ test.describe('Pitch Detection Signal Injection', () => {
 
 		// Wait for the tuner to settle and show data
 		const tuner = page.locator('#tuner');
-		await expect(tuner).toBeVisible({ timeout: 10000 });
+		await expect(tuner).toBeVisible({ timeout: 1000 });
 
 		// Check note name
 		const noteName = page.locator('.note-name');
@@ -61,10 +61,9 @@ test.describe('Pitch Detection Signal Injection', () => {
 		await page.click('button.start-btn');
 
 		const tuner = page.locator('#tuner');
-		await expect(tuner).toBeVisible({ timeout: 10000 });
+		await expect(tuner).toBeVisible({ timeout: 1000 });
 
-		const noteName = page.locator('.note-name');
-		await expect(noteName).toHaveText('C4');
+		const noteName = page.locator('.note-name');		await expect(noteName).toHaveText('C4');
 
 		const freqDisplay = page.locator('.freq').first();
 		await expect(async () => {
