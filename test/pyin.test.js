@@ -131,7 +131,15 @@ describe('PYIN Algorithm Test Suite', () => {
             const logInitial = new Float32Array(numStates).fill(Math.log(1 / 3));
 
             // Log Transition Matrix (Self-transition favored)
-            const transitions = { logMatrix: new Float32Array(numStates * numStates) };
+            const transitions = { 
+                logMatrix: new Float32Array(numStates * numStates),
+                voicedIdx: [1, 2],
+                unvoicedIdx: [0],
+                voicedRanges: [
+                    { start: 1, end: 2 }, // For state 1, can reach 1 and 2
+                    { start: 1, end: 2 }  // For state 2, can reach 1 and 2
+                ]
+            };
             const selfProb = Math.log(0.8);
             const switchProb = Math.log(0.1);
 
@@ -180,13 +188,19 @@ describe('PYIN Algorithm Test Suite', () => {
             const prevLogProbs = new Float32Array([Math.log(0.8), Math.log(0.2)]); // S0: 0.8, S1: 0.2
 
             // Transitions
+            // S0: Unvoiced, S1: Voiced
             // S0->S0: 0.9, S0->S1: 0.1
             // S1->S0: 0.5, S1->S1: 0.5
             const transitions = {
                 logMatrix: new Float32Array([
                     Math.log(0.9), Math.log(0.1),
                     Math.log(0.5), Math.log(0.5)
-                ])
+                ]),
+                voicedIdx: [1],
+                unvoicedIdx: [0],
+                voicedRanges: [
+                    { start: 1, end: 1 }
+                ]
             };
 
             // Current Observation
