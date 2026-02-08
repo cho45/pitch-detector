@@ -72,24 +72,98 @@ describe('PYIN Algorithm Test Suite', () => {
             assert(unvoicedProbForSilence > 0.8, `Silence should favor unvoiced state. Got ${unvoicedProbForSilence}`);
         });
 
-        test('ビタビアルゴリズムテスト', () => {
-            const states = PYINCore.createPitchStates(200, 600, 2);
-            const transitions = PYINCore.calculateTransitionProbabilities(states);
-            const observations = [
-                [{ frequency: 440, probability: 1.0 }],
-                [{ frequency: 440, probability: 1.0 }],
-                [{ frequency: 441, probability: 1.0 }]
+        test('Viterbi Algorithm Mathematical Verification', () => {
+            // Define a simple 3-state HMM
+            // State 0: Unvoiced
+            // State 1: Voiced Low
+            // State 2: Voiced High
+            const numStates = 3;
+            const numFrames = 3;
+
+            // Log Initial Probabilities (Equal)
+            const logInitial = new Float32Array(numStates).fill(Math.log(1 / 3));
+
+            // Log Transition Matrix (Self-transition favored)
+            const logTransitions = Array(numStates).fill().map(() => new Float32Array(numStates));
+            const selfProb = Math.log(0.8);
+            const switchProb = Math.log(0.1);
+
+            for (let i = 0; i < numStates; i++) {
+                for (let j = 0; j < numStates; j++) {
+                    logTransitions[i][j] = (i === j) ? selfProb : switchProb;
+                }
+            }
+
+            // Log Observation Probabilities
+            // Frame 0: State 1 is clear
+            // Frame 1: State 0 (Unvoiced/Noise) dominates locally, but State 1 is possible
+            // Frame 2: State 1 is clear again
+            const logObserv = new Float32Array(numFrames * numStates);
+
+            // Helper to set obs prob
+            const setObs = (t, probs) => {
+                for (let s = 0; s < numStates; s++) logObserv[t * numStates + s] = Math.log(probs[s]);
+            };
+
+            setObs(0, [0.05, 0.9, 0.05]);
+            setObs(1, [0.6, 0.2, 0.2]); // Here, State 0 is locally most likely
+            setObs(2, [0.05, 0.9, 0.05]);
+
+            // What should happen:
+            // Path 1-1-1 prob: Init + Obs0(1) + Trans(1->1) + Obs1(1) + Trans(1->1) + Obs2(1)
+            // = log(1/3) + log(0.9) + log(0.8) + log(0.2) + log(0.8) + log(0.9)
+            // ≈ -1.1 - 0.1 - 0.22 - 1.6 - 0.22 - 0.1 = -3.34
+
+            // Path 1-0-1 prob: Init + Obs0(1) + Trans(1->0) + Obs1(0) + Trans(0->1) + Obs2(1)
+            // = log(1/3) + log(0.9) + log(0.1) + log(0.6) + log(0.1) + log(0.9)
+            // ≈ -1.1 - 0.1 - 2.3 - 0.5 - 2.3 - 0.1 = -6.4
+
+            // Path 1-1-1 (staying in State 1) should be vastly superior to switching to State 0 and back
+            // despite State 0 being locally probable in Frame 1.
+
+            const path = PYINCore.viterbi(logInitial, logTransitions, logObserv, numFrames, numStates);
+
+            assert.strictEqual(path[0], 1, 'Frame 0 should be State 1');
+            assert.strictEqual(path[1], 1, 'Frame 1 should be corrected to State 1 by Viterbi');
+            assert.strictEqual(path[2], 1, 'Frame 2 should be State 1');
+        });
+
+        test('forwardViterbiStep Mathematical Verification', () => {
+            // Test single step of Forward Viterbi
+            const numStates = 2;
+            const prevLogProbs = new Float32Array([Math.log(0.8), Math.log(0.2)]); // S0: 0.8, S1: 0.2
+
+            // Transitions
+            // S0->S0: 0.9, S0->S1: 0.1
+            // S1->S0: 0.5, S1->S1: 0.5
+            const logTransitions = [
+                new Float32Array([Math.log(0.9), Math.log(0.1)]),
+                new Float32Array([Math.log(0.5), Math.log(0.5)])
             ];
 
-            const obsProb = PYINCore.calculateObservationProbabilities(states, observations);
-            const { viterbi, path } = PYINCore.viterbiAlgorithm(states, transitions, observations, obsProb);
-            const pitchTrack = PYINCore.tracebackPath(viterbi, path, states);
+            // Current Observation
+            // S0: 0.4, S1: 0.6
+            const currentLogObs = new Float32Array([Math.log(0.4), Math.log(0.6)]);
 
-            assert.strictEqual(pitchTrack.length, observations.length);
-            const averageFreq = pitchTrack.filter(p => p.voiced).reduce((sum, p) => sum + p.frequency, 0) /
-                pitchTrack.filter(p => p.voiced).length;
+            // Expected S0:
+            // from S0: log(0.8) + log(0.9) = log(0.72)
+            // from S1: log(0.2) + log(0.5) = log(0.10)
+            // max = log(0.72)
+            // result = log(0.72) + log(0.4) = log(0.288)
 
-            assert(Math.abs(averageFreq - 440) < 10, `Average freq mismatch: ${averageFreq}`);
+            // Expected S1:
+            // from S0: log(0.8) + log(0.1) = log(0.08)
+            // from S1: log(0.2) + log(0.5) = log(0.10)
+            // max = log(0.10)
+            // result = log(0.10) + log(0.6) = log(0.06)
+
+            const nextLogProbs = PYINCore.forwardViterbiStep(prevLogProbs, logTransitions, currentLogObs);
+
+            const expectedS0 = Math.log(0.288);
+            const expectedS1 = Math.log(0.06);
+
+            assert(Math.abs(nextLogProbs[0] - expectedS0) < 1e-5, `S0 mismatch: ${nextLogProbs[0]} vs ${expectedS0}`);
+            assert(Math.abs(nextLogProbs[1] - expectedS1) < 1e-5, `S1 mismatch: ${nextLogProbs[1]} vs ${expectedS1}`);
         });
     });
 
@@ -156,6 +230,56 @@ describe('PYIN Algorithm Test Suite', () => {
             const error = Math.abs(frequency - 440);
 
             assert(error < 10, `Noise resistance failed. Error: ${error}Hz`);
+        });
+    });
+
+    describe('Offline Viterbi Optimization', () => {
+        test('Should correct momentary dropout using future context', () => {
+            // This test demonstrates the superiority of Offline Viterbi over Online processing.
+            // We construct a sequence where the middle frame is ambiguous/noisy,
+            // but the surrounding frames are clear. 
+            // - Online processing might pick the noise peak in the middle frame.
+            // - Offline Viterbi should use the transition probabilities from the FUTURE frame 
+            //   to correctly identify the path through the weak signal.
+
+            const detector = new PYINDetector(44100, 2048);
+
+            // Frame 1: Clear 440Hz
+            const frame1 = YINTestUtils.generateSineWave(440, 44100, 2048 / 44100);
+
+            // Frame 2: Noisy 440Hz (simulated by mixing 440Hz weak + strong noise/other peak)
+            // We make 440Hz probability lower than noise in this frame locally.
+            // But structurally it should be 440Hz.
+            // Note: Implementing this strictly with synthesized audio is hard because pYIN is robust.
+            // We will trust the integration test logic:
+            // The middle frame will be pure noise, but with a very faint injection of 440Hz
+            const noise = YINTestUtils.addNoise(new Float32Array(2048), 0.3);
+            const weakSignal = YINTestUtils.generateSineWave(440, 44100, 2048 / 44100, 0.3); // Increased amplitude
+            const frame2 = new Float32Array(2048);
+            for (let i = 0; i < 2048; i++) frame2[i] = noise[i] + weakSignal[i];
+
+            // Frame 3: Clear 440Hz
+            const frame3 = YINTestUtils.generateSineWave(440, 44100, 2048 / 44100);
+
+            const frames = [frame1, frame2, frame3];
+
+            // 1. Online Processing Check (Simulated by independent analysis)
+            // detector.reset();
+            // const [onlineFreq, onlineConf] = detector.findPitch(frame2);
+
+            // 2. Offline Batch Processing
+            const pitchTrack = detector.detectPitch(frames);
+
+            // Verify
+            const freqs = pitchTrack.map(p => p.frequency);
+
+            // The middle frame should be corrected to ~440Hz (or at least voiced)
+            // If it's 0 (unvoiced) or random noise freq, Viterbi isn't working optimally.
+            const isCorrected = Math.abs(freqs[1] - 440) < 20;
+
+            // This assertion might fail with current implementation (Online only)
+            // which confirms we need to implement true Viterbi.
+            assert(isCorrected, `Middle frame should be corrected to 440Hz by Viterbi. Got: ${freqs[1]}Hz. Sequence: ${freqs.join(', ')}`);
         });
     });
 

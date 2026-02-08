@@ -1,5 +1,5 @@
 
-import { PitchDetector } from "./lib/pitchy.mjs";
+import { PitchDetector } from "./lib/pitchy.js";
 import { YINDetector, createYINDetector } from "./lib/yin.js";
 import { PYINDetector, createPYINDetector } from "./lib/pyin.js";
 import { MPMDetector, createMPMDetector } from "./lib/mpm.js";
@@ -19,7 +19,7 @@ class AGCAudioWorklet {
 		this.workletNode = null;
 		this.isReady = false;
 	}
-	
+
 	/**
 	 * Initialize the AudioWorklet
 	 * @returns {Promise<void>}
@@ -28,7 +28,7 @@ class AGCAudioWorklet {
 		try {
 			// Load the AGC processor worklet
 			await this.audioContext.audioWorklet.addModule('./agc-processor.js');
-			
+
 			// Create the AudioWorkletNode
 			this.workletNode = new AudioWorkletNode(this.audioContext, 'agc-processor', {
 				processorOptions: {
@@ -39,21 +39,21 @@ class AGCAudioWorklet {
 					minGain: this.minGain
 				}
 			});
-			
+
 			// Listen for messages from the processor
 			this.workletNode.port.onmessage = (event) => {
 				this.handleProcessorMessage(event.data);
 			};
-			
+
 			this.isReady = true;
 			console.log('🎚️ AGC AudioWorklet initialized successfully');
-			
+
 		} catch (error) {
 			console.error('❌ Failed to initialize AGC AudioWorklet:', error);
 			throw error;
 		}
 	}
-	
+
 	/**
 	 * Handle messages from the AudioWorklet processor
 	 * @param {Object} data - Message data
@@ -70,7 +70,7 @@ class AGCAudioWorklet {
 				console.log('🎚️ AGC processor message:', data);
 		}
 	}
-	
+
 	/**
 	 * Get the AudioWorkletNode for connecting in audio graph
 	 * @returns {AudioWorkletNode|null} The worklet node
@@ -78,7 +78,7 @@ class AGCAudioWorklet {
 	getNode() {
 		return this.workletNode;
 	}
-	
+
 	/**
 	 * Update AGC parameters
 	 * @param {Object} params - Parameters to update
@@ -94,10 +94,10 @@ class AGCAudioWorklet {
 			if (params.minGain !== undefined) this.minGain = params.minGain;
 			return;
 		}
-		
+
 		// Send parameters to the processor
 		this.workletNode.port.postMessage(params);
-		
+
 		// Update local cache
 		if (params.targetLevel !== undefined) this.targetLevel = params.targetLevel;
 		if (params.attackTime !== undefined) this.attackTime = params.attackTime;
@@ -105,7 +105,7 @@ class AGCAudioWorklet {
 		if (params.maxGain !== undefined) this.maxGain = params.maxGain;
 		if (params.minGain !== undefined) this.minGain = params.minGain;
 	}
-	
+
 	/**
 	 * Check if the worklet is ready for use
 	 * @returns {boolean} True if ready
@@ -123,9 +123,9 @@ Vue.createApp({
 			// https://en.wikipedia.org/wiki/Scientific_pitch_notation
 			// center C is note number 60
 			// center A is note number 69 and 440Hz
-			freqOfA4 : 440,
+			freqOfA4: 440,
 			// 88 keys = A0(21) - C8(108)
-			startNote : 60 - 24,
+			startNote: 60 - 24,
 			endNote: 60 + 24,
 
 			scale: "0,major",
@@ -271,21 +271,21 @@ Vue.createApp({
 		window.addEventListener('resize', () => {
 			this.resize();
 		});
-		
+
 		// Add global event listeners for UI interaction
 		this.handleMouseMove = () => {
 			this.onUIInteraction();
 		};
-		
+
 		this.handleTouchStart = () => {
 			this.onUIInteraction();
 		};
-		
+
 		document.body.addEventListener('mousemove', this.handleMouseMove);
 		document.body.addEventListener('touchstart', this.handleTouchStart);
 		console.log('Global UI interaction listeners added');
 	},
-	
+
 	beforeUnmount() {
 		// Remove global event listeners
 		if (this.handleMouseMove) {
@@ -312,7 +312,7 @@ Vue.createApp({
 			if (this.selectedName === 'Hz') {
 				return this.noteToHz(note).toFixed(1);
 			} else {
-				const names = this.noteName.find( (i) => i.name === this.selectedName );
+				const names = this.noteName.find((i) => i.name === this.selectedName);
 				const name = names.values[note % 12];
 				return name + octave;
 			}
@@ -324,9 +324,9 @@ Vue.createApp({
 			if (type === 'major') {
 				return [1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1][pos] === 1;
 			} else
-			if (type === 'minor') {
-				return [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0][pos] === 1;
-			}
+				if (type === 'minor') {
+					return [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0][pos] === 1;
+				}
 		},
 
 		differenceInCent: function (a, b) {
@@ -335,7 +335,7 @@ Vue.createApp({
 
 		initCanvas: function () {
 			// this.scopeCanvas = this.$refs.scopeCanvas;
-			
+
 			const canvas = this.$refs.main;
 			canvas.style.width = null;
 			canvas.style.height = null;
@@ -370,15 +370,15 @@ Vue.createApp({
 				if ((note % 12) === this.parsedScale[0]) {
 					// key
 					ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
-					ctx.lineWidth   = 2 * window.devicePixelRatio;
+					ctx.lineWidth = 2 * window.devicePixelRatio;
 				} else
-				if (this.isScaleTone(note)) {
-					ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-					ctx.lineWidth   = 1 * window.devicePixelRatio;
-				} else {
-					ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
-					ctx.lineWidth   = 1 * window.devicePixelRatio;
-				}
+					if (this.isScaleTone(note)) {
+						ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+						ctx.lineWidth = 1 * window.devicePixelRatio;
+					} else {
+						ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+						ctx.lineWidth = 1 * window.devicePixelRatio;
+					}
 
 				ctx.beginPath();
 				ctx.moveTo(25 * window.devicePixelRatio, y);
@@ -413,7 +413,7 @@ Vue.createApp({
 
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 			const source = this.audioContext.createMediaStreamSource(stream);
-			
+
 			// Create and initialize AGC AudioWorklet
 			this.agc = new AGCAudioWorklet(
 				this.audioContext,
@@ -421,20 +421,20 @@ Vue.createApp({
 				this.agcAttackTime,
 				this.agcReleaseTime
 			);
-			
+
 			const analyser = this.audioContext.createAnalyser();
-			
+
 			try {
 				await this.agc.init();
 
 				// Always connect audio graph: source -> AGC AudioWorklet -> analyser
 				source.connect(this.agc.getNode());
 				this.agc.getNode().connect(analyser);
-				
+
 				// Set initial enabled state
 				const enabledParam = this.agc.getNode().parameters.get('enabled');
 				enabledParam.value = this.agcEnabled ? 1 : 0;
-				
+
 				console.log('🎚️ AGC AudioWorklet connected in audio graph');
 			} catch (error) {
 				console.error('❌ AGC AudioWorklet initialization failed:', error);
@@ -459,42 +459,42 @@ Vue.createApp({
 			const PART = 4;
 			const PART_LENGTH = analyser.fftSize / PART;
 			const sampleRate = this.audioContext.sampleRate;
-			
+
 			// Initialize detector with current algorithm
 			this.initDetector();
 
 			const scopeCtx = this.$refs.scope.getContext("2d");
 			const scopeWidth = this.$refs.scope.width;
 			const scopeHeight = this.$refs.scope.height;
-			console.log({scopeWidth, scopeHeight});
+			console.log({ scopeWidth, scopeHeight });
 
 			const audioData = new Float32Array(analyser.fftSize);
-			
+
 			// Performance monitoring
 			let frameCount = 0;
 			let totalPitchTime = 0;
-			
+
 			const draw = () => {
 				// Stop animation loop if audio context is closed
 				if (!this.audioContext) {
 					return;
 				}
-				
+
 				analyser.getFloatTimeDomainData(audioData);
-				
+
 				// Note: AGC processing is now handled by AudioWorkletNode in real-time
 
 				let detector = this.detector;
 				for (let p = 0; p < PART; p++) {
 					const start = PART_LENGTH * p;
-					
+
 					// Measure pitch detection performance
 					const pitchStart = performance.now();
 					const [freq, clarity] = detector.findPitch(audioData.subarray(start, start + PART_LENGTH), sampleRate);
 					const pitchTime = performance.now() - pitchStart;
 					totalPitchTime += pitchTime;
 					frameCount++;
-					
+
 					// Log performance every 100 frames
 					if (frameCount % 100 === 0) {
 						console.log(`📊 ${this.detector.constructor.name} avg detection time: ${(totalPitchTime / frameCount).toFixed(3)}ms/frame`);
@@ -521,7 +521,7 @@ Vue.createApp({
 
 
 					// draw info
-					const fit  = this.noteToHz(Math.round(note));
+					const fit = this.noteToHz(Math.round(note));
 					this.targetFreq = fit;
 					this.actualFreq = freq;
 					this.clarity = clarity;
@@ -539,7 +539,7 @@ Vue.createApp({
 					scopeCtx.moveTo(0, scopeHeight / 2);
 					for (var i = 0, len = audioData.length; i < len; i++) {
 						scopeCtx.lineTo(
-							scopeWidth / len * i, 
+							scopeWidth / len * i,
 							(audioData[i] / 2) * scopeHeight + scopeHeight / 2
 						);
 					}
@@ -550,12 +550,12 @@ Vue.createApp({
 				requestAnimationFrame(draw);
 			};
 			requestAnimationFrame(draw);
-			
+
 			// Ensure UI hide timer starts after recording begins
 			this.startUIHideTimer();
 		},
 
-		stop: async function() {
+		stop: async function () {
 			console.log('Stop called');
 			if (this.audioContext) {
 				await this.audioContext.close();
@@ -564,14 +564,14 @@ Vue.createApp({
 				this.detector = null;
 				this.status = "Tap to start";
 				console.log('🛑 Audio context stopped');
-				
+
 				// Show UI and clear timer when recording stops
 				this.showUI();
 				this.clearUIHideTimer();
 			}
 		},
 
-		resize: function ()  {
+		resize: function () {
 			if (this.resizeTimer) clearInterval(this.resizeTimer);
 			this.resizeTimer = setTimeout(() => {
 				console.log('resize');
@@ -580,20 +580,20 @@ Vue.createApp({
 		},
 
 		// Pitch detector initialization
-		initDetector: function() {
+		initDetector: function () {
 			if (!this.audioContext) {
 				console.log('🔄 AudioContext not available, detector will be initialized on start');
 				return;
 			}
-			
+
 			const PART_LENGTH = 4096 / 4; // Same as in start() method
 			const sampleRate = this.audioContext.sampleRate;
-			
+
 			// Clean up existing detector if any
 			if (this.detector) {
 				console.log('🔄 Replacing existing detector:', this.detector.constructor.name);
 			}
-			
+
 			// Create detector based on selected algorithm
 			if (this.pitchAlgorithm === 'yin') {
 				this.detector = new YINDetector(sampleRate, PART_LENGTH, 0.2);
@@ -608,40 +608,40 @@ Vue.createApp({
 				this.detector = PitchDetector.forFloat32Array(PART_LENGTH);
 				console.log('🎵 Using Pitchy pitch detection algorithm');
 			}
-			
+
 			console.log('🔄 Detector initialized:', this.detector.constructor.name);
 		},
 
 		// UI visibility control methods
-		startUIHideTimer: function() {
+		startUIHideTimer: function () {
 			this.clearUIHideTimer();
 			this.uiHideTimer = setTimeout(() => {
 				this.hideUI();
 			}, 3000); // Hide after 3 seconds
 		},
 
-		clearUIHideTimer: function() {
+		clearUIHideTimer: function () {
 			if (this.uiHideTimer) {
 				clearTimeout(this.uiHideTimer);
 				this.uiHideTimer = null;
 			}
 		},
 
-		hideUI: function() {
+		hideUI: function () {
 			if (this.audioContext) {
 				this.uiVisible = false;
 				console.log('UI hidden');
 			}
 		},
 
-		showUI: function() {
+		showUI: function () {
 			this.uiVisible = true;
 			if (this.audioContext) {
 				this.startUIHideTimer();
 			}
 		},
 
-		onUIInteraction: function() {
+		onUIInteraction: function () {
 			if (this.audioContext) {
 				this.showUI();
 			}
