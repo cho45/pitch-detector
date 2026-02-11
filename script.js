@@ -3,11 +3,12 @@ import { PitchDetector } from "./lib/pitchy.js";
 import { YINDetector, createYINDetector } from "./lib/yin.js";
 import { PYINDetector, createPYINDetector } from "./lib/pyin.js";
 import { MPMDetector, createMPMDetector } from "./lib/mpm.js";
+import { ViewController } from "./lib/view-controller.js";
 import { i18n, t } from "./lib/i18n.js";
 
 /**
- * AGC AudioWorklet Node Wrapper
- * Manages AudioWorkletNode for real-time automatic gain control
+ * AGC AudioWorklet ノードラッパー
+ * リアルタイム自動ゲイン制御のための AudioWorkletNode を管理
  */
 class AGCAudioWorklet {
 	constructor(audioContext, targetLevel = 0.3, attackTime = 0.003, releaseTime = 0.1) {
@@ -27,10 +28,10 @@ class AGCAudioWorklet {
 	 */
 	async init() {
 		try {
-			// Load the AGC processor worklet
+			// AGC プロセッサワークレットの読み込み
 			await this.audioContext.audioWorklet.addModule('./agc-processor.js');
 
-			// Create the AudioWorkletNode
+			// AudioWorkletNode の作成
 			this.workletNode = new AudioWorkletNode(this.audioContext, 'agc-processor', {
 				processorOptions: {
 					targetLevel: this.targetLevel,
@@ -41,7 +42,7 @@ class AGCAudioWorklet {
 				}
 			});
 
-			// Listen for messages from the processor
+			// プロセッサからのメッセージを監視
 			this.workletNode.port.onmessage = (event) => {
 				this.handleProcessorMessage(event.data);
 			};
@@ -118,19 +119,22 @@ class AGCAudioWorklet {
 
 const PITCH_DETECTION_SAMPLE_RATE = 24000;
 
-Vue.createApp({
+const app = Vue.createApp({
 	data() {
 		return {
 			status: t("tap_to_start"),
 			currentLanguage: i18n.language,
 
 			// https://en.wikipedia.org/wiki/Scientific_pitch_notation
-			// center C is note number 60
-			// center A is note number 69 and 440Hz
+			// 中央Cはノート番号60
+			// 中央Aはノート番号69、440Hz
 			freqOfA4: 440,
-			// 88 keys = A0(21) - C8(108)
-			startNote: 60 - 24,
-			endNote: 60 + 24,
+			// 88鍵 = A0(21) - C8(108)
+			// displayRange: 36 (3オクターブ)
+			displayRange: 36,
+			viewController: null,
+
+			// startNote/endNote は動的になったため data から削除
 
 			scale: "0,major",
 
@@ -145,10 +149,10 @@ Vue.createApp({
 			down: false,
 			selectedName: "CDEFGAB",
 
-			// Pitch detection algorithm selection
+			// ピッチ検出アルゴリズムの選択
 			pitchAlgorithm: "pyin", // "pitchy", "yin", "pyin", or "mpm"
 
-			// AGC settings
+			// AGC設定
 			agcEnabled: true,
 			agcTargetLevel: 0.3,
 			agcAttackTime: 0.003,
@@ -156,12 +160,12 @@ Vue.createApp({
 
 			openSetting: false,
 
-			// Audio state
+			// オーディオ状態
 			audioContext: null,
 			agc: null,
 			detector: null,
 
-			// UI visibility control
+			// UI表示制御
 			uiVisible: true,
 			uiHideTimer: null,
 
@@ -205,10 +209,6 @@ Vue.createApp({
 	},
 
 	computed: {
-		noteLength() {
-			return this.endNote - this.startNote;
-		},
-
 		parsedScale() {
 			const [keyNote, type] = this.scale.split(/,/);
 			return [+keyNote, type];
@@ -216,20 +216,8 @@ Vue.createApp({
 	},
 
 	watch: {
-		showScope() {
-			this.resize();
-		},
-
-		scale() {
-			this.initCanvas();
-		},
-
-		selectedName() {
-			this.initCanvas();
-		},
-
 		freqOfA4() {
-			this.initCanvas();
+			// this.setupCanvas(); // redraw needed
 		},
 
 		pitchAlgorithm() {
@@ -279,9 +267,9 @@ Vue.createApp({
 
 	created() {
 		this.loadSettings();
-		// Watch all setting properties and save to localStorage
+		// 全ての設定プロパティを監視し、localStorageに保存
 		const settingsToWatch = [
-			'freqOfA4', 'startNote', 'endNote', 'scale', 'showScope',
+			'freqOfA4', 'displayRange', 'scale', 'showScope',
 			'selectedName', 'pitchAlgorithm', 'agcEnabled',
 			'agcTargetLevel', 'agcAttackTime', 'agcReleaseTime'
 		];
@@ -294,13 +282,34 @@ Vue.createApp({
 
 	mounted() {
 		console.log("mounted");
-		this.initCanvas();
+
+		// ViewControllerの初期化
+		this.viewController = new ViewController({
+			initialNote: 69, // A4
+			displayRange: this.displayRange,
+			speed: 5.0
+		});
+
+		this.setupCanvas();
+
+		// アニメーションループの開始
+		let lastTime = performance.now();
+		const loop = (time) => {
+			const dt = (time - lastTime) / 1000;
+			lastTime = time;
+
+			this.update(dt);
+			this.draw(dt);
+
+			requestAnimationFrame(loop);
+		};
+		requestAnimationFrame(loop);
 
 		window.addEventListener('resize', () => {
 			this.resize();
 		});
 
-		// Add global event listeners for UI interaction
+		// UI操作のためのグローバルイベントリスナーを追加
 		this.handleMouseMove = () => {
 			this.onUIInteraction();
 		};
@@ -315,7 +324,7 @@ Vue.createApp({
 	},
 
 	beforeUnmount() {
-		// Remove global event listeners
+		// グローバルイベントリスナーの削除
 		if (this.handleMouseMove) {
 			document.body.removeEventListener('mousemove', this.handleMouseMove);
 		}
@@ -365,7 +374,128 @@ Vue.createApp({
 			return 1200 * Math.log2(b / a);
 		},
 
-		initCanvas: function () {
+
+
+		resize: function () {
+			if (this.resizeTimer) clearInterval(this.resizeTimer);
+			this.resizeTimer = setTimeout(() => {
+				console.log('resize');
+				this.setupCanvas();
+			}, 250);
+		},
+
+		update: function (dt) {
+			if (this.viewController) {
+				this.viewController.update(dt);
+			}
+		},
+
+		/**
+		 * Main draw loop called every frame
+		 */
+		draw: function (dt) {
+			if (!this.mainCtx || !this.viewController) return;
+
+			const { startNote, endNote, centerNote } = this.viewController.getRenderState();
+			// Calculate 'noteLength' equivalent for drawing
+			const noteLength = endNote - startNote; // Should be equal to displayRange
+
+			// Clear & Draw Grid
+			const ctx = this.mainCtx;
+			const width = this.mainWidth;
+			const height = this.mainHeight;
+
+			ctx.clearRect(0, 0, width, height);
+
+			for (let n = 0; n <= noteLength; n++) {
+				// Draw based on startNote
+				// startNote might be float, so we need to align to integer notes?
+				// To draw grid lines for integer notes:
+				// Iterate from ceil(startNote) to floor(endNote)
+
+				const gridNote = Math.floor(startNote) + n;
+				if (gridNote > endNote) break;
+
+				// Position Y
+				// y = height / len * (len - (note - start))
+				//   = height * (1 - (note - start) / len)
+				const y = height * (1 - (gridNote - startNote) / noteLength);
+
+				if ((gridNote % 12) === this.parsedScale[0]) {
+					// key
+					ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+					ctx.lineWidth = 2 * window.devicePixelRatio;
+				} else if (this.isScaleTone(gridNote)) {
+					ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+					ctx.lineWidth = 1 * window.devicePixelRatio;
+				} else {
+					ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+					ctx.lineWidth = 1 * window.devicePixelRatio;
+				}
+
+				ctx.beginPath();
+				ctx.moveTo(25 * window.devicePixelRatio, y);
+				ctx.lineTo(width, y);
+				ctx.stroke();
+				ctx.font = `${12 * window.devicePixelRatio}px sans-serif`;
+				ctx.fillStyle = this.isScaleTone(gridNote) ? "rgba(255, 255, 255, 0.99)" : "rgba(255, 255, 255, 0.55)";
+				ctx.textBaseline = 'middle';
+				ctx.fillText(this.nameOfNote(gridNote), 0, y);
+			}
+
+			// グラフスクロールの描画
+			// 毎フレームグラフを左に1px移動 (約60fps)
+			// かつ垂直方向の移動を補正
+			if (this.graphCtx && this.$refs.graph) {
+				const ppn = height / noteLength; // ノートあたりのピクセル数
+				// Noteの前フレームからの差分を取得
+				const lastStart = this._lastStartNote ?? startNote;
+				const deltaNote = startNote - lastStart;
+				this._lastStartNote = startNote;
+
+				// サブピクセル移動量を蓄積
+				if (!this._dyAccum) this._dyAccum = 0;
+				this._dyAccum += deltaNote * ppn;
+
+				// 整数ピクセル分だけ移動
+				const moveY = Math.round(this._dyAccum);
+
+				if (moveY !== 0) {
+					// 蓄積値から移動分を引く
+					this._dyAccum -= moveY;
+				}
+
+				// 左に1pxスクロールし、垂直方向にシフト
+				this.graphCtx.globalCompositeOperation = 'copy';
+				this.graphCtx.drawImage(
+					this.$refs.graph,
+					1, 0, width - 1, height, // ソース (右へ1pxシフトではない、右側の部分を取得して左へ移動)
+					// (1,0) を (0, moveY) に移動したい
+					// Source: x=1, y=0, w=width-1, h=height
+					// Dest: x=0, y=moveY, w=width-1, h=height
+
+					// dy が正の場合 (startNote が増加、ビューが上に移動)、古い点 (絶対ピッチ) は下に移動する。
+					// つまり dy が正で正しい (y は下に向かって増加)。
+
+					0, moveY, width - 1, height
+				);
+				this.graphCtx.globalCompositeOperation = 'source-over';
+
+				// 検知がある場合、新しい点を描画
+				if (this.clarity > 0.0) { // 描画のための任意の閾値
+					const currentNote = this.note; // handleAudioChunk で更新される
+					// y = height - (note - startNote) * ppn
+					const ptY = height - (currentNote - startNote) * ppn;
+
+					this.graphCtx.fillStyle = `rgba(255, 0, 0, ${this.clarity})`;
+					this.graphCtx.fillRect(width - 2, ptY - 2, 4, 4);
+				}
+
+
+			}
+		},
+
+		setupCanvas: function () {
 			// this.scopeCanvas = this.$refs.scopeCanvas;
 			if (!this.$refs.main) return;
 
@@ -384,44 +514,7 @@ Vue.createApp({
 			canvas.height = height;
 
 			const ctx = canvas.getContext("2d");
-
-			ctx.clearRect(0, 0, width, height);
-
-			for (let n = 0, len = this.noteLength; n < len; n++) {
-				const y = height / len * (len - n);
-				const note = this.startNote + n;
-				// console.log(note, nameOfNote(note));
-
-				/*
-				if (note === 60) {
-					// middle C
-					ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
-					ctx.lineWidth   = 2 * window.devicePixelRatio;
-				}
-				*/
-
-				if ((note % 12) === this.parsedScale[0]) {
-					// key
-					ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
-					ctx.lineWidth = 2 * window.devicePixelRatio;
-				} else
-					if (this.isScaleTone(note)) {
-						ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-						ctx.lineWidth = 1 * window.devicePixelRatio;
-					} else {
-						ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
-						ctx.lineWidth = 1 * window.devicePixelRatio;
-					}
-
-				ctx.beginPath();
-				ctx.moveTo(25 * window.devicePixelRatio, y);
-				ctx.lineTo(width, y);
-				ctx.stroke();
-				ctx.font = `${12 * window.devicePixelRatio}px sans-serif`;
-				ctx.fillStyle = this.isScaleTone(note) ? "rgba(255, 255, 255, 0.99)" : "rgba(255, 255, 255, 0.55)";
-				ctx.textBaseline = 'middle';
-				ctx.fillText(this.nameOfNote(note), 0, y);
-			}
+			// Clear logic moved to draw()
 
 			this.mainCtx = ctx;
 			this.mainWidth = width;
@@ -433,28 +526,27 @@ Vue.createApp({
 			this.$refs.graph.height = height;
 			this.graphCtx = this.$refs.graph.getContext('2d');
 		},
-
 		start: async function () {
 			if (this.audioContext) return;
 
 			console.log('Recording started');
 			this.status = t("recording");
 
-			// latencyHint: 'interactive' is important for responsiveness
+			// latencyHint: 'interactive' は応答性に重要
 			this.audioContext = new AudioContext({
 				latencyHint: 'interactive',
 			});
 
 			let source;
 			if (window.__PITCH_DETECTOR_INJECT_SOURCE__) {
-				console.log('💉 Injecting test audio source');
+				console.log('💉 テスト用音源を注入 (Injecting test audio source)');
 				source = await window.__PITCH_DETECTOR_INJECT_SOURCE__(this.audioContext);
 			} else {
 				const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 				source = this.audioContext.createMediaStreamSource(stream);
 			}
 
-			// 1. Initialize AGC AudioWorklet
+			// 1. AGC AudioWorklet の初期化
 			this.agc = new AGCAudioWorklet(
 				this.audioContext,
 				this.agcTargetLevel,
@@ -462,7 +554,7 @@ Vue.createApp({
 				this.agcReleaseTime
 			);
 
-			// 2. Initialize StreamProcessor (10kHz Resampling & Contiguous Chunks)
+			// 2. StreamProcessor の初期化 (10kHzリサンプリング & 連続チャンク)
 			try {
 				await this.agc.init();
 				await this.audioContext.audioWorklet.addModule('./stream-processor.js');
@@ -474,28 +566,28 @@ Vue.createApp({
 				});
 				const analyser = this.audioContext.createAnalyser();
 
-				// Audio Graph: Source -> AGC -> StreamProcessor -> Analyser (for scope)
+				// オーディオグラフ: Source -> AGC -> StreamProcessor -> Analyser (スコープ用)
 				source.connect(this.agc.getNode());
 				this.agc.getNode().connect(streamNode);
 				streamNode.connect(analyser);
 
-				// Set initial AGC enabled state
+				// AGC有効状態の初期設定
 				const enabledParam = this.agc.getNode().parameters.get('enabled');
 				if (enabledParam) enabledParam.value = this.agcEnabled ? 1 : 0;
 
 				console.log('🎚️ Audio graph connected: source -> AGC -> StreamProcessor -> Analyser');
 
-				// 3. Initialize detector (ALWAYS 10kHz at this point)
+				// 3. 検出器の初期化 (この時点では常に10kHz)
 				this.initDetector();
 
-				// Listen for audio chunks from StreamProcessor
+				// StreamProcessor からのオーディオチャンクを監視
 				streamNode.port.onmessage = (event) => {
 					if (event.data.type === 'audioChunk') {
 						this.handleAudioChunk(event.data.buffer, event.data.sampleRate);
 					}
 				};
 
-				// Setup scope drawing
+				// スコープ描画のセットアップ
 				analyser.fftSize = 4096;
 				const scopeCtx = this.$refs.scope.getContext("2d");
 				const scopeWidth = this.$refs.scope.width;
@@ -534,21 +626,21 @@ Vue.createApp({
 		},
 
 		/**
-		 * Handle contiguous audio chunks from StreamProcessor
-		 * Runs pitch detection at a fixed 10kHz rate.
+		 * StreamProcessor からの連続オーディオチャンクを処理
+		 * 固定10kHzレートでピッチ検出を実行
 		 */
 		handleAudioChunk: function (buffer, sampleRate) {
 			if (!this.detector || !this.audioRingBuffer) return;
 
-			// 1. Shift existing data to make room for new chunk
-			// (Optimized: native copyWithin is fast)
+			// 1. 新しいチャンクのために既存データをシフト
+			// (最適化: ネイティブの copyWithin は高速)
 			const overlap = this.audioRingBuffer.length - buffer.length;
 			this.audioRingBuffer.copyWithin(0, buffer.length);
 
-			// 2. Append new chunk at the end
+			// 2. 末尾に新しいチャンクを追加
 			this.audioRingBuffer.set(buffer, overlap);
 
-			// First fill check
+			// 初回充填チェック
 			if (!this.isBufferFull) {
 				this.audioRingBufferPtr += buffer.length;
 				if (this.audioRingBufferPtr >= this.audioRingBuffer.length) {
@@ -558,28 +650,36 @@ Vue.createApp({
 				}
 			}
 
-			// 3. Detect pitch on the full sliding window
+			// 3. スライディングウィンドウ全体でピッチ検出を実行
 			const pitchStart = performance.now();
 			const [freq, clarity] = this.detector.findPitch(this.audioRingBuffer, sampleRate);
 			const pitchTime = performance.now() - pitchStart;
 
-			// Performance monitoring
+			// パフォーマンス監視
 			if (!this._pCount) this._pCount = 0;
 			if (!this._pTime) this._pTime = 0;
 			this._pTime += pitchTime;
 			this._pCount++;
 			if (this._pCount % 60 === 0) {
-				// Log every ~1 sec (60 frames)
+				// 約1秒ごとにログ出力 (60フレーム)
 				console.log(`📊 ${this.detector.constructor.name} avg: ${(this._pTime / this._pCount).toFixed(3)}ms/frame (${(sampleRate / 1000).toFixed(1)}kHz)`);
 				this._pCount = 0;
 				this._pTime = 0;
 			}
 
-			// Update state for UI
+			// UI用の状態更新
 			this.actualFreq = freq;
 			this.clarity = clarity;
 			const note = this.hzToNote(freq);
 			this.note = note;
+
+			if (this.viewController) {
+				if (clarity > 0.9) { // トラッキングのための高い明瞭度閾値
+					this.viewController.setDetectedPitch(note);
+				} else {
+					this.viewController.setSilence();
+				}
+			}
 
 			const fit = this.noteToHz(Math.round(note));
 			this.targetFreq = fit;
@@ -587,17 +687,7 @@ Vue.createApp({
 			this.up = this.freqError < -5;
 			this.down = this.freqError > 5;
 
-			// Update history graph
-			const y = this.mainHeight / this.noteLength * (this.noteLength - (note - this.startNote));
-			this.graphCtx.drawImage(
-				this.$refs.graph,
-				1, 0, this.$refs.graph.width - 1, this.$refs.graph.height,
-				0, 0, this.$refs.graph.width - 1, this.$refs.graph.height
-			);
-			this.graphCtx.fillStyle = "#000000";
-			this.graphCtx.fillRect(this.mainWidth - 4, 0, 4, this.mainHeight);
-			this.graphCtx.fillStyle = `rgba(255, 0, 0, ${clarity})`;
-			this.graphCtx.fillRect(this.mainWidth - 4, y - 4, 8, 8);
+			// Graph updating moved to draw()
 		},
 
 		stop: async function () {
@@ -625,26 +715,20 @@ Vue.createApp({
 			}
 		},
 
-		resize: function () {
-			if (this.resizeTimer) clearInterval(this.resizeTimer);
-			this.resizeTimer = setTimeout(() => {
-				console.log('resize');
-				this.initCanvas();
-			}, 250);
-		},
 
-		// Pitch detector initialization
+
+		// ピッチ検出器の初期化
 		initDetector: function () {
-			const sampleRate = PITCH_DETECTION_SAMPLE_RATE; // Fixed at 24kHz from StreamProcessor
-			const PART_LENGTH = 2048;  // Detection window size
-			const maxFreq = 4200;      // Covers piano C8 and more
+			const sampleRate = PITCH_DETECTION_SAMPLE_RATE; // StreamProcessor から固定24kHz
+			const PART_LENGTH = 2048;  // 検出ウィンドウサイズ
+			const maxFreq = 4200;      // ピアノC8以上をカバー
 
-			// Clean up existing detector if any
+			// 既存の検出器があればクリーンアップ
 			if (this.detector) {
 				console.log('🔄 Replacing existing detector:', this.detector.constructor.name);
 			}
 
-			// Create detector based on selected algorithm
+			// 選択されたアルゴリズムに基づいて検出器を作成
 			if (this.pitchAlgorithm === 'yin') {
 				this.detector = new YINDetector(sampleRate, PART_LENGTH, 0.2);
 				console.log('🎵 Using YIN pitch detection algorithm');
@@ -661,15 +745,15 @@ Vue.createApp({
 
 			console.log('🔄 Detector initialized:', this.detector.constructor.name);
 
-			// Initialize Ring Buffer for sliding window detection
-			// We need at least PART_LENGTH samples. 
-			// 2048 is safe for 1024 window with overlap.
+			// スライディングウィンドウ検出用のリングバッファ初期化
+			// 少なくとも PART_LENGTH サンプル必要
+			// 2048 は 1024 ウィンドウとオーバーラップに対して安全
 			this.audioRingBuffer = new Float32Array(PART_LENGTH);
 			this.audioRingBufferPtr = 0;
 			this.isBufferFull = false;
 		},
 
-		// UI visibility control methods
+		// UI表示制御メソッド
 		startUIHideTimer: function () {
 			this.clearUIHideTimer();
 			if (this.openSetting) return; // Settings dialog is open, don't start timer
@@ -743,8 +827,7 @@ Vue.createApp({
 		saveSettings: function () {
 			const settings = {
 				freqOfA4: this.freqOfA4,
-				startNote: this.startNote,
-				endNote: this.endNote,
+				displayRange: this.displayRange,
 				scale: this.scale,
 				showScope: this.showScope,
 				selectedName: this.selectedName,
@@ -785,6 +868,7 @@ Vue.createApp({
 		}
 	}
 }).mount("#app");
+window.app = app;
 
 if ('serviceWorker' in navigator) {
 	window.addEventListener('load', () => {
