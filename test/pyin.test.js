@@ -31,7 +31,7 @@ describe('PYIN Algorithm Test Suite', () => {
             const cmndf = new Float32Array(signal.length);
             PYINCore.calculateDifferenceFunction(signal, df);
             PYINCore.calculateCMNDF(df, cmndf);
-            
+
             const context = YINTestUtils.createPYINContext(44100, signal.length);
             const nCands = PYINCore.extractMultipleCandidates(cmndf, 44100, context);
 
@@ -80,16 +80,16 @@ describe('PYIN Algorithm Test Suite', () => {
             const candLogProbs = new Float32Array(1);
             const candLogFreqs = new Float32Array(1);
             PYINCore.fillObservationLogProbabilities(states, candidates, 1, logProbs1, stepsPerSemitone, candLogProbs, candLogFreqs);
-            
+
             // 無声尤度は、解像度独立な密度補正 log(1 - voicingProb) と一致すべき。
             const expectedUnvoicedLog1 = Math.log(1 - 0.9);
-            assert(Math.abs(logProbs1[unvoicedStateIndex] - expectedUnvoicedLog1) < 1e-6, 
+            assert(Math.abs(logProbs1[unvoicedStateIndex] - expectedUnvoicedLog1) < 1e-6,
                 `Likelihood mismatch. Expected ${expectedUnvoicedLog1}, got ${logProbs1[unvoicedStateIndex]}`);
 
             // シナリオ2: 候補が存在しない場合
             const logProbs2 = new Float32Array(states.length);
             PYINCore.fillObservationLogProbabilities(states, [], 0, logProbs2, stepsPerSemitone, candLogProbs, candLogFreqs);
-            
+
             const expectedUnvoicedLog2 = Math.log(1.0);
             assert(Math.abs(logProbs2[unvoicedStateIndex] - expectedUnvoicedLog2) < 1e-6);
         });
@@ -97,7 +97,7 @@ describe('PYIN Algorithm Test Suite', () => {
         test('密度補正の解像度独立性テスト', () => {
             const minFreq = 200;
             const maxFreq = 600;
-            const candidates = [{ frequency: 440, probability: 0.5 }]; 
+            const candidates = [{ frequency: 440, probability: 0.5 }];
             const candLogProbs = new Float32Array(1);
             const candLogFreqs = new Float32Array(1);
 
@@ -115,8 +115,52 @@ describe('PYIN Algorithm Test Suite', () => {
 
             // 密度補正により、ピッチビンの密度に関わらず、無声尤度が積分的に一定（log(0.5)）であることを確認。
             assert(Math.abs(unvoicedLogLow - Math.log(0.5)) < 1e-6);
-            assert(Math.abs(unvoicedLogLow - unvoicedLogHigh) < 1e-6, 
+            assert(Math.abs(unvoicedLogLow - unvoicedLogHigh) < 1e-6,
                 `Unvoiced likelihood shifted with resolution! Low: ${unvoicedLogLow}, High: ${unvoicedLogHigh}`);
+        });
+
+        test('fillObservationLogProbabilities should track optimal candidate frequencies', () => {
+            const minFreq = 400; // ~G4
+            const maxFreq = 500; // ~B4
+            const stepsPerSemitone = 1; // Coarse grid
+            const states = PYINCore.createPitchStates(minFreq, maxFreq, stepsPerSemitone);
+
+            // Create a candidate that is slightly off-grid
+            // A4 = 440Hz. Grid probably has 440.0. 
+            // Let's use 442.0Hz as candidate.
+            const preciseFreq = 442.0;
+            const candidates = [{ frequency: preciseFreq, probability: 0.9 }];
+
+            const nCands = 1;
+            const outputLogProbs = new Float32Array(states.length);
+            const candLogProbs = new Float32Array(nCands);
+            const candLogFreqs = new Float32Array(nCands);
+            const optimalFreqs = new Float32Array(states.length); // New buffer
+
+            PYINCore.fillObservationLogProbabilities(
+                states, candidates, nCands, outputLogProbs, stepsPerSemitone,
+                candLogProbs, candLogFreqs, optimalFreqs
+            );
+
+            // Find the state corresponding to A4 (closest to 442Hz)
+            const bestStateIdx = states.findIndex(s => s.voiced && Math.abs(s.frequency - 440) < 5);
+            assert(bestStateIdx >= 0, "State near 440Hz should exist");
+
+            // The optimal frequency for this state should be the candidate's frequency, not the state's frequency
+            /*
+            console.log({
+                stateFreq: states[bestStateIdx].frequency,
+                optimalFreq: optimalFreqs[bestStateIdx],
+                candidateFreq: preciseFreq
+            });
+            */
+
+            assert(Math.abs(optimalFreqs[bestStateIdx] - preciseFreq) < 1e-6,
+                `Optimal frequency should match candidate. Got ${optimalFreqs[bestStateIdx]}, expected ${preciseFreq}`);
+
+            // Unvoiced state should have 0 (or safe fallback)
+            const unvoicedIdx = states.findIndex(s => !s.voiced);
+            assert.strictEqual(optimalFreqs[unvoicedIdx], 0, "Unvoiced state should have 0 frequency");
         });
 
         test('Viterbi Algorithm Mathematical Verification', () => {
@@ -131,7 +175,7 @@ describe('PYIN Algorithm Test Suite', () => {
             const logInitial = new Float32Array(numStates).fill(Math.log(1 / 3));
 
             // Log Transition Matrix (Self-transition favored)
-            const transitions = { 
+            const transitions = {
                 logMatrix: new Float32Array(numStates * numStates),
                 voicedIdx: [1, 2],
                 unvoicedIdx: [0],
@@ -246,7 +290,7 @@ describe('PYIN Algorithm Test Suite', () => {
 
             // HMMの確率が安定するまで数フレーム実行
             let confidence = 0;
-            for(let i=0; i<5; i++) {
+            for (let i = 0; i < 5; i++) {
                 [, confidence] = detector.findPitch(signal);
             }
 
@@ -335,10 +379,10 @@ describe('PYIN Algorithm Test Suite', () => {
             const detector = new PYINDetector(sampleRate, frameSize);
             const cleanSignal = YINTestUtils.generateSineWave(440, sampleRate, frameSize / sampleRate);
             const noisySignal = YINTestUtils.addNoise(cleanSignal, 0.1);
-            
+
             detector.reset();
-            const [onlineFreq, ] = detector.findPitch(noisySignal);
-            
+            const [onlineFreq,] = detector.findPitch(noisySignal);
+
             const frames = [noisySignal];
             const pitchTrack = detector.detectPitch(frames);
             const offlineFreq = pitchTrack[0].frequency;
@@ -352,7 +396,7 @@ describe('PYIN Algorithm Test Suite', () => {
             const states = detector.states;
             const nStates = states.length;
             const findIdx = (f) => states.findIndex(s => s.voiced && Math.abs(1200 * Math.log2(s.frequency / f)) < 25);
-            
+
             const state440Idx = findIdx(440);
             const state445Idx = findIdx(445);
             const state600Idx = findIdx(600);
@@ -363,13 +407,13 @@ describe('PYIN Algorithm Test Suite', () => {
 
             const obsLogs = new Float32Array(3 * nStates).fill(-50);
             obsLogs[0 * nStates + state440Idx] = 0;
-            obsLogs[1 * nStates + state445Idx] = -1.0; 
+            obsLogs[1 * nStates + state445Idx] = -1.0;
             obsLogs[1 * nStates + state600Idx] = -0.5; // 観測自体は600Hzの方が強い設定
             const state450Idx = findIdx(450);
             assert(state450Idx !== -1, "450Hz state should exist");
             obsLogs[2 * nStates + state450Idx] = 0;
 
-            const initial = new Float32Array(nStates).fill(Math.log(0.5 / (nStates-1)));
+            const initial = new Float32Array(nStates).fill(Math.log(0.5 / (nStates - 1)));
             const unvoicedIdx = states.findIndex(s => !s.voiced);
             initial[unvoicedIdx] = Math.log(0.5);
 
@@ -397,7 +441,7 @@ describe('PYIN Algorithm Test Suite', () => {
 
         test('HMM平滑化効果テスト（ノイズ挿入）', () => {
             const detector = new PYINDetector(44100, 2048, 80, 1000);
-            const goodFrame = YINTestUtils.generateSineWave(261.6, 44100, 2048 / 44100); 
+            const goodFrame = YINTestUtils.generateSineWave(261.6, 44100, 2048 / 44100);
             const noiseFrame = YINTestUtils.addNoise(new Float32Array(2048), 0.8);
             const frames = [goodFrame, goodFrame, noiseFrame, goodFrame, goodFrame];
 
