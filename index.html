@@ -61,16 +61,18 @@
 			}
 
 			#settings-dialog {
-				background: rgba(255, 255, 255, 0.85);
+				background: #f8f9fa;
+				border: none;
+				border-radius: 20px;
+				box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+				padding: 30px;
+				max-width: 450px;
+				width: 90%;
+				max-height: 90vh;
+				overflow-y: auto;
+				color: #1a1a2e;
 				backdrop-filter: blur(15px);
 				-webkit-backdrop-filter: blur(15px);
-				border: 1px solid rgba(255, 255, 255, 0.3);
-				border-radius: 20px;
-				padding: 25px;
-				box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-				color: #333;
-				max-width: 90vw;
-				width: 400px;
 			}
 
 			#settings-dialog::backdrop {
@@ -283,6 +285,58 @@
 				transform: translateY(-2px);
 				box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 			}
+
+			/* Algorithm Card Styles */
+			.algorithm-list {
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+				margin-top: 10px;
+			}
+
+			.algorithm-card {
+				position: relative;
+				display: block;
+				padding: 12px 16px;
+				background: rgba(255, 255, 255, 0.5);
+				border: 2px solid transparent;
+				border-radius: 12px;
+				cursor: pointer;
+				transition: all 0.2s ease;
+			}
+
+			.algorithm-card:hover {
+				background: rgba(255, 255, 255, 0.8);
+			}
+
+			.algorithm-card.selected {
+				background: white;
+				border-color: #4ecdc4;
+				box-shadow: 0 4px 12px rgba(78, 205, 196, 0.2);
+			}
+
+			.algorithm-card input[type="radio"] {
+				position: absolute;
+				opacity: 0;
+				width: 1px;
+				height: 1px;
+				pointer-events: none;
+			}
+
+			.algorithm-card .card-title {
+				display: block;
+				font-size: 15px;
+				font-weight: 600;
+				color: #1a1a2e;
+				margin-bottom: 4px;
+			}
+
+			.algorithm-card .card-desc {
+				display: block;
+				font-size: 12px;
+				color: #718096;
+				line-height: 1.4;
+			}
 		</style>
 		<script src="lib/vue.global.js" defer></script>
 		<script src="script.js" type="module" defer></script>
@@ -330,6 +384,15 @@
 			<dialog ref="settingsDialog" id="settings-dialog">
 				<h2>{{ t('settings_subtitle') || 'Settings' }}</h2>
 				<div>
+					<p>
+						<label for="options-language">
+							{{ t('language') }}
+						</label>
+						<select v-model="currentLanguage" id="options-language">
+							<option value="en">English</option>
+							<option value="ja">日本語</option>
+						</select>
+					</p>
 					<p>
 						<label for="options-scope">
 							{{ t('scope') }}
@@ -385,55 +448,56 @@
 						</label>
 						<input type="number" v-model="freqOfA4" id="options-tune">
 					</p>
-					<p>
-						<label for="options-algorithm">
-							{{ t('algorithm') }}
+					<p style="border-top: 1px solid rgba(0,0,0,0.1); padding-top: 15px; margin-top: 15px;">
+						<label for="options-advanced" style="font-weight: bold; color: #4ecdc4;">
+							{{ t('advanced_settings') }}
 						</label>
-						<select v-model="pitchAlgorithm" id="options-algorithm">
-							<option value="pitchy">Pitchy (Autocorr + NSDF)</option>
-							<option value="yin">YIN (Difference Function)</option>
-							<option value="pyin">PYIN (Probabilistic YIN + HMM)</option>
-							<option value="mpm">MPM (McLeod Pitch Method)</option>
-						</select>
+						<input type="checkbox" v-model="showAdvanced" id="options-advanced">
 					</p>
-					<p>
-						<label for="options-agc-enabled">
-							{{ t('agc_enabled') }}
-						</label>
-						<input type="checkbox" v-model="agcEnabled" id="options-agc-enabled">
-					</p>
-					<div v-if="agcEnabled">
-						<p>
-							<label for="options-agc-target">
-								{{ t('agc_target_level') }}
+					<div v-show="showAdvanced" style="background: rgba(0,0,0,0.03); padding: 15px; border-radius: 12px; margin-top: 10px;">
+						<div class="algorithm-settings">
+							<label>
+								{{ t('algorithm') }}
 							</label>
-							<input type="range" v-model.number="agcTargetLevel" min="0.1" max="0.8" step="0.05" id="options-agc-target">
-							<span>{{ agcTargetLevel.toFixed(2) }}</span>
-						</p>
+							<div class="algorithm-list">
+								<label v-for="algo in algorithms" :key="algo.id" class="algorithm-card" :class="{ selected: pitchAlgorithm === algo.id }">
+									<input type="radio" v-model="pitchAlgorithm" :value="algo.id">
+									<span class="card-title">{{ algo.name }} <small>{{ algo.subtitle }}</small></span>
+									<span class="card-desc">{{ t(algo.descKey) }}</span>
+								</label>
+							</div>
+						</div>
 						<p>
-							<label for="options-agc-attack">
-								{{ t('agc_attack_time') }}
+							<label for="options-agc-enabled">
+								{{ t('agc_enabled') }}
 							</label>
-							<input type="range" v-model.number="agcAttackTime" min="0.001" max="0.1" step="0.001" id="options-agc-attack">
-							<span>{{ (agcAttackTime * 1000).toFixed(1) }}ms</span>
+							<input type="checkbox" v-model="agcEnabled" id="options-agc-enabled">
 						</p>
-						<p>
-							<label for="options-agc-release">
-								{{ t('agc_release_time') }}
-							</label>
-							<input type="range" v-model.number="agcReleaseTime" min="0.01" max="1.0" step="0.01" id="options-agc-release">
-							<span>{{ (agcReleaseTime * 1000).toFixed(0) }}ms</span>
-						</p>
+						<div v-if="agcEnabled" style="padding-left: 10px; border-left: 2px solid #4ecdc4;">
+							<p>
+								<label for="options-agc-target">
+									{{ t('agc_target_level') }}
+								</label>
+								<input type="range" v-model.number="agcTargetLevel" min="0.1" max="0.8" step="0.05" id="options-agc-target">
+								<span>{{ agcTargetLevel.toFixed(2) }}</span>
+							</p>
+							<p>
+								<label for="options-agc-attack">
+									{{ t('agc_attack_time') }}
+								</label>
+								<input type="range" v-model.number="agcAttackTime" min="0.001" max="0.1" step="0.001" id="options-agc-attack">
+								<span>{{ (agcAttackTime * 1000).toFixed(1) }}ms</span>
+							</p>
+							<p>
+								<label for="options-agc-release">
+									{{ t('agc_release_time') }}
+								</label>
+								<input type="range" v-model.number="agcReleaseTime" min="0.01" max="1.0" step="0.01" id="options-agc-release">
+								<span>{{ (agcReleaseTime * 1000).toFixed(0) }}ms</span>
+							</p>
+						</div>
 					</div>
-					<p>
-						<label for="options-language">
-							{{ t('language') }}
-						</label>
-						<select v-model="currentLanguage" id="options-language">
-							<option value="en">English</option>
-							<option value="ja">日本語</option>
-						</select>
-					</p>
+
 				</div>
 				<div class="dialog-footer">
 					<button class="close-dialog-btn" @click="clearSettings" style="background: #ff6b6b; float: left; margin-right: 10px;">{{ t('clear_settings') }}</button>

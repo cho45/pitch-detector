@@ -11,8 +11,10 @@ test.describe('Settings Persistence', () => {
 	test('should save and restore settings after reload', async ({ page }) => {
 		await page.locator('.settings-btn').click();
 
-		// Change algorithm to MPM
-		await page.selectOption('#options-algorithm', 'mpm');
+		// Toggle advanced settings
+		await page.check('#options-advanced');
+		// Change algorithm to MPM (now visible)
+		await page.check('input[value="mpm"]', { force: true });
 		// Toggle scope on
 		await page.check('#options-scope');
 		// Change Freq of A4
@@ -22,6 +24,7 @@ test.describe('Settings Persistence', () => {
 		const savedSettings = await page.evaluate(() => localStorage.getItem('pitch-detector-settings'));
 		const settings = JSON.parse(savedSettings);
 		expect(settings.pitchAlgorithm).toBe('mpm');
+		expect(settings.showAdvanced).toBe(true);
 		expect(settings.showScope).toBe(true);
 		expect(settings.freqOfA4).toBe(442);
 
@@ -30,7 +33,8 @@ test.describe('Settings Persistence', () => {
 
 		// Verify settings are restored
 		await page.locator('.settings-btn').click();
-		await expect(page.locator('#options-algorithm')).toHaveValue('mpm');
+		await expect(page.locator('#options-advanced')).toBeChecked();
+		await expect(page.locator('input[value="mpm"]')).toBeChecked();
 		await expect(page.locator('#options-scope')).toBeChecked();
 		await expect(page.locator('#options-tune')).toHaveValue('442');
 	});
@@ -39,7 +43,8 @@ test.describe('Settings Persistence', () => {
 		await page.locator('.settings-btn').click();
 
 		// Change something to non-default
-		await page.selectOption('#options-algorithm', 'mpm');
+		await page.check('#options-advanced');
+		await page.check('input[value="mpm"]', { force: true });
 
 		// Mock window.confirm to return true
 		page.on('dialog', dialog => dialog.accept());
@@ -56,6 +61,12 @@ test.describe('Settings Persistence', () => {
 
 		// Verify setting is back to default (pyin is default)
 		await page.locator('.settings-btn').click();
-		await expect(page.locator('#options-algorithm')).toHaveValue('pyin');
+		// Advanced settings should be hidden by default
+		await expect(page.locator('#options-advanced')).not.toBeChecked();
+		await expect(page.locator('.algorithm-settings')).not.toBeVisible();
+
+		// Open it to check the radio
+		await page.check('#options-advanced');
+		await expect(page.locator('input[value="pyin"]')).toBeChecked();
 	});
 });

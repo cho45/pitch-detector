@@ -41,11 +41,18 @@ test.describe('Settings UI', () => {
 
 	test('should change algorithm', async ({ page }) => {
 		await page.locator('.settings-btn').click();
-		const algoSelect = page.locator('#options-algorithm');
+
+		// Advanced settings should be hidden by default
+		await expect(page.locator('.algorithm-settings')).not.toBeVisible();
+
+		// Toggle advanced settings
+		await page.locator('#options-advanced').check();
+		await expect(page.locator('.algorithm-settings')).toBeVisible();
 
 		// Change to MPM
-		await algoSelect.selectOption('mpm');
-		await expect(algoSelect).toHaveValue('mpm');
+		const mpmRadio = page.locator('input[value="mpm"]');
+		await mpmRadio.check({ force: true });
+		await expect(mpmRadio).toBeChecked();
 
 		// Close settings to interact with the main UI
 		await page.locator('button:has-text("✕ 閉じる"), button:has-text("✕ Close")').click();
@@ -71,6 +78,10 @@ test.describe('Settings UI', () => {
 
 	test('should toggle AGC and show/hide its settings', async ({ page }) => {
 		await page.locator('.settings-btn').click();
+
+		// Toggle advanced settings (AGC is in advanced)
+		await page.locator('#options-advanced').check();
+
 		const agcCheckbox = page.locator('#options-agc-enabled');
 		const agcSettings = page.locator('label[for="options-agc-target"]');
 

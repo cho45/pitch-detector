@@ -139,6 +139,7 @@ const app = Vue.createApp({
 			scale: "0,major",
 
 			showScope: false,
+			showAdvanced: false,
 
 			freqError: 0,
 			clarity: 0,
@@ -151,6 +152,12 @@ const app = Vue.createApp({
 
 			// ピッチ検出アルゴリズムの選択
 			pitchAlgorithm: "pyin", // "pitchy", "yin", "pyin", or "mpm"
+			algorithms: [
+				{ id: 'pyin', name: 'PYIN', subtitle: '(Probabilistic YIN + HMM)', descKey: 'pitch_pyin_desc' },
+				{ id: 'mpm', name: 'MPM', subtitle: '(McLeod Pitch Method)', descKey: 'pitch_mpm_desc' },
+				{ id: 'yin', name: 'YIN', subtitle: '(Difference Function)', descKey: 'pitch_yin_desc' },
+				{ id: 'pitchy', name: 'Pitchy', subtitle: '(Autocorr + NSDF)', descKey: 'pitch_pitchy_desc' }
+			],
 
 			// AGC設定
 			agcEnabled: true,
@@ -271,7 +278,7 @@ const app = Vue.createApp({
 		const settingsToWatch = [
 			'freqOfA4', 'displayRange', 'scale', 'showScope',
 			'selectedName', 'pitchAlgorithm', 'agcEnabled',
-			'agcTargetLevel', 'agcAttackTime', 'agcReleaseTime'
+			'agcTargetLevel', 'agcAttackTime', 'agcReleaseTime', 'showAdvanced'
 		];
 		settingsToWatch.forEach(prop => {
 			this.$watch(prop, () => {
@@ -839,7 +846,8 @@ const app = Vue.createApp({
 				agcEnabled: this.agcEnabled,
 				agcTargetLevel: this.agcTargetLevel,
 				agcAttackTime: this.agcAttackTime,
-				agcReleaseTime: this.agcReleaseTime
+				agcReleaseTime: this.agcReleaseTime,
+				showAdvanced: this.showAdvanced
 			};
 			localStorage.setItem('pitch-detector-settings', JSON.stringify(settings));
 			console.log('⚙️ Settings saved to localStorage');
