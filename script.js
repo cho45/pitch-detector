@@ -261,7 +261,7 @@ const app = Vue.createApp({
 		currentLanguage() {
 			i18n.setLanguage(this.currentLanguage);
 			this.status = this.audioContext ? t("recording") : t("tap_to_start");
-			this.initCanvas();
+			this.setupCanvas();
 		},
 	},
 
@@ -287,7 +287,9 @@ const app = Vue.createApp({
 		this.viewController = new ViewController({
 			initialNote: 69, // A4
 			displayRange: this.displayRange,
-			speed: 5.0
+			speed: 5.0,
+			minNote: 21,  // A0
+			maxNote: 108  // C8
 		});
 
 		this.setupCanvas();
@@ -356,6 +358,8 @@ const app = Vue.createApp({
 		},
 
 		t: function (key) {
+			// currentLanguage に依存させることで言語切り替え時に再描画を促す
+			this.currentLanguage;
 			return t(key);
 		},
 

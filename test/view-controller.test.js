@@ -107,4 +107,25 @@ describe('ViewController', () => {
 		assert.ok(Math.abs(state2.startNote - (70 - 18)) < 0.001);
 		assert.ok(Math.abs(state2.endNote - (70 + 18)) < 0.001);
 	});
+
+
+	it('should clamp target note within min/max limits', () => {
+		const vc = new ViewController({
+			initialNote: 60,
+			minNote: 21,  // A0
+			maxNote: 108  // C8
+		});
+
+		// Inside range
+		vc.setDetectedPitch(60);
+		assert.strictEqual(vc.targetCenterNote, 60);
+
+		// Too low
+		vc.setDetectedPitch(10);
+		assert.strictEqual(vc.targetCenterNote, 21);
+
+		// Too high
+		vc.setDetectedPitch(120);
+		assert.strictEqual(vc.targetCenterNote, 108);
+	});
 });

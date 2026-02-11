@@ -83,4 +83,64 @@ test.describe('Auto-Scrolling View Logic', () => {
 		const centerAtSilence = await page.evaluate(() => window.app.viewController.currentCenterNote);
 		expect(centerAtSilence).toBeCloseTo(81, 0.5);
 	});
+
+	test('should respect min/max scroll limits', async ({ page }) => {
+		// Temporarily restrict internal limits to test clamping
+		// Limits: 70 ~ 80
+		await page.evaluate(() => {
+			window.app.viewController.minNote = 70;
+			window.app.viewController.maxNote = 80;
+		});
+
+		// 1. Test Max Clamping
+		// Inject Note 81 (A5 = 880Hz) -> Should clamp to 80
+		await page.evaluate(() => {
+			window.__PITCH_DETECTOR_INJECT_SOURCE__ = async (audioContext) => {
+				const osc = audioContext.createOscillator();
+				osc.type = 'sine';
+				osc.frequency.value = 880;
+				osc.start();
+				return osc;
+			};
+		});
+
+		await page.click('button.start-btn');
+
+		// Wait for detection
+		await expect(async () => {
+			const clarity = await page.evaluate(() => window.app.clarity);
+			expect(clarity).toBeGreaterThan(0.9);
+		}).toPass({ timeout: 2000 });
+
+		// Check target center note is clamped to 80
+		const targetCenter = await page.evaluate(() => window.app.viewController.targetCenterNote);
+		expect(targetCenter).toBe(80);
+
+
+		// 2. Test Min Clamping
+		// Stop and restart with low frequency
+		await page.click('button.stop-btn');
+		await page.waitForTimeout(500);
+
+		// Inject Note 60 (C4 = 261.63Hz) -> Should clamp to 70
+		await page.evaluate(() => {
+			window.__PITCH_DETECTOR_INJECT_SOURCE__ = async (audioContext) => {
+				const osc = audioContext.createOscillator();
+				osc.type = 'sine';
+				osc.frequency.value = 261.63;
+				osc.start();
+				return osc;
+			};
+		});
+
+		await page.click('button.start-btn');
+
+		await expect(async () => {
+			const clarity = await page.evaluate(() => window.app.clarity);
+			expect(clarity).toBeGreaterThan(0.9);
+		}).toPass({ timeout: 2000 });
+
+		const targetCenterLow = await page.evaluate(() => window.app.viewController.targetCenterNote);
+		expect(targetCenterLow).toBe(70);
+	});
 });
