@@ -457,7 +457,7 @@ const app = Vue.createApp({
 			// グラフスクロールの描画
 			// 毎フレームグラフを左に1px移動 (約60fps)
 			// かつ垂直方向の移動を補正
-			if (this.graphCtx && this.$refs.graph) {
+			if (this.graphCtx && this.$refs.graph && this.audioContext) {
 				const ppn = height / noteLength; // ノートあたりのピクセル数
 				// Noteの前フレームからの差分を取得
 				const lastStart = this._lastStartNote ?? startNote;
@@ -744,7 +744,7 @@ const app = Vue.createApp({
 				this.detector = new YINDetector(sampleRate, PART_LENGTH, 0.2);
 				console.log('🎵 Using YIN pitch detection algorithm');
 			} else if (this.pitchAlgorithm === 'pyin') {
-				this.detector = new PYINDetector(sampleRate, PART_LENGTH, 80, maxFreq);
+				this.detector = new PYINDetector(sampleRate, PART_LENGTH, 25, maxFreq);
 				console.log('🎵 Using PYIN pitch detection algorithm');
 			} else if (this.pitchAlgorithm === 'mpm') {
 				this.detector = new MPMDetector(sampleRate, PART_LENGTH, 0.93);
